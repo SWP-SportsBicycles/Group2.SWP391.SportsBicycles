@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Group2.SWP391.SportsBicycles.DAL\Group2.SWP391.SportsBicycles.DAL.csproj" />
+    <ProjectReference Include="..\Group2.SWP391.SportsBicycles.Service\Group2.SWP391.SportsBicycles.Services.csproj" />
   </ItemGroup>
 
 </Project>
