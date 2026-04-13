@@ -6,4 +6,14 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Group2.SWP391.SportsBicycles.Common\Group2.SWP391.SportsBicycles.Common.csproj" />
+    <ProjectReference Include="..\Group2.SWP391.SportsBicycles.DAL\Group2.SWP391.SportsBicycles.DAL.csproj" />
+  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="FirebaseAdmin" Version="3.4.0" />
+		<PackageReference Include="Google.Cloud.Storage.V1" Version="4.13.0" />
+		<PackageReference Include="MailKit" Version="4.13.0" />
+		
+	</ItemGroup>
 </Project>

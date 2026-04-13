@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,7 +7,14 @@ using System.Threading.Tasks;
 
 namespace Group2.SWP391.SportsBicycles.DAL.Contract
 {
-    internal class IUnitOfWork
+    public interface IUnitOfWork
     {
+
+        public Task<int> SaveChangeAsync();
+        Task BeginTransactionAsync();
+        Task CommitAsync();
+        Task RollbackAsync();
+        void ClearChangeTracker();
+        DbContext GetDbContext();
     }
 }
