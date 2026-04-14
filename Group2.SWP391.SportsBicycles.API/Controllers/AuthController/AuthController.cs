@@ -156,5 +156,39 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.AuthController
 
             return Ok(result);
         }
+        [HttpPost("google-login")]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequestDto dto)
+        {
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var device = Request.Headers["User-Agent"].ToString();
+
+            var result = await _authService.GoogleSignInAsync(
+                dto.IdToken,
+                dto.Role,
+                ip,
+                device
+            );
+
+            if (!result.Success)
+                return BadRequest(new { message = result.Message });
+
+            // set cookie giống login thường
+            Response.Cookies.Append("refreshToken", result.RefreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Path = "/",
+                Expires = DateTimeOffset.UtcNow.AddDays(7)
+            });
+
+            return Ok(new
+            {
+                success = true,
+                token = result.Token,
+                message = result.Message,
+                role = result.Role
+            });
+        }
     }
 }
