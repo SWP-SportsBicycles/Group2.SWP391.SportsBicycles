@@ -44,6 +44,13 @@ builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepositor
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
+builder.Services.AddScoped<IBuyerListingService, BuyerListingService>();
+builder.Services.AddScoped<IInspectorService, InspectorService>();
+builder.Services.AddScoped<ISellerListingService, SellerListingService>();
+
+
+builder.Services.AddHttpContextAccessor();
+
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

@@ -18,20 +18,34 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
         public Guid? InspectionId { get; set; }
         public Inspection? Inspection { get; set; }
 
+        // ===== BUSINESS CORE =====
+        public string SerialNumber { get; set; } = default!; // 🔥 chống xe trộm
         public string Category { get; set; } = default!;
         public string Brand { get; set; } = default!;
         public string FrameSize { get; set; } = default!;
         public string FrameMaterial { get; set; } = default!;
+        public string Condition { get; set; } = default!; // 🔥 bắt buộc SRS
+
+        // ===== SPEC =====
         public string Paint { get; set; } = default!;
         public string Groupset { get; set; } = default!;
         public string Operating { get; set; } = default!;
         public string TireRim { get; set; } = default!;
         public string BrakeType { get; set; } = default!;
+
+        // ===== INSPECTION RESULT =====
         public string Overall { get; set; } = default!;
 
-        public BikeStatusEnum Status { get; set; }
+        // ===== PRICE =====
         public decimal Price { get; set; }
 
+        // ===== STATUS =====
+        public BikeStatusEnum Status { get; set; }
+
+        // ===== GEO =====
+        public string City { get; set; } = default!;
+
+        // ===== RELATION =====
         public ICollection<Media> Medias { get; set; } = new List<Media>();
         public ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
