@@ -19,15 +19,23 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")
     )
-);
+);  
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
-//var firebaseConfig = builder.Configuration.GetSection("Firebase").Get<Dictionary<string, object>>();
+var firebaseConfig = builder.Configuration.GetSection("Firebase").Get<Dictionary<string, object>>();
+var privateKey = firebaseConfig["private_key"].ToString();
 
-//FirebaseApp.Create(new AppOptions()
-//{
-//    Credential = GoogleCredential.FromJson(JsonSerializer.Serialize(firebaseConfig))
-//});
+// 🔥 FIX newline
+privateKey = privateKey.Replace("\\n", "\n");
+
+firebaseConfig["private_key"] = privateKey;
+
+FirebaseApp.Create(new AppOptions()
+{
+    Credential = GoogleCredential.FromJson(
+        JsonSerializer.Serialize(firebaseConfig)
+    )
+});
 // Add services to the container.
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddMemoryCache();
