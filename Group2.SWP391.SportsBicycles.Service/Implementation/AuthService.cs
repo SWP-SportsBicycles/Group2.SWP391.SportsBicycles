@@ -1,4 +1,6 @@
-﻿using FirebaseAdmin.Auth;
+﻿using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
+using FirebaseAdmin.Auth;
 using Group2.SWP391.SportsBicycles.Common.DTOs;
 using Group2.SWP391.SportsBicycles.Common.Enums;
 using Group2.SWP391.SportsBicycles.Common.Helpers;
@@ -27,7 +29,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         private readonly IMemoryCache _cache;
         private readonly IEmailTemplateService _emailTemplateService;
         private readonly IConfiguration _config;
-       
+       private readonly ICloudinaryService _cloudinary;
 
         private const int OTP_MINUTES = 2;
         private const int REFRESH_DAYS = 7;
@@ -41,7 +43,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             IEmailService email,
             IMemoryCache cache,
             IEmailTemplateService emailTemplateService,
-            IConfiguration config
+            IConfiguration config,
+            ICloudinaryService cloudinary
             )
         {
             _userRepo = userRepo;
@@ -52,7 +55,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             _cache = cache;
             _emailTemplateService = emailTemplateService;
             _config = config;
-            
+            _cloudinary = cloudinary;
+
         }
 
         private static string NormalizeEmail(string email) => email.Trim().ToLower();
@@ -599,29 +603,32 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             };
         }
 
-        //public async Task<(bool Success, string Message, string? AvtUrl)> UploadAvatarAsync(Guid userId, IFormFile file)
-        //{
-        //    var user = await _userRepo.GetById(userId);
-        //    if (user == null)
-        //        return (false, "Người dùng không tồn tại.", null);
+        public async Task<string> UploadAvatarAsync(Guid userId, IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                throw new Exception("File không hợp lệ");
 
-        //    try
-        //    {
-        //        var url = await _cloudinary.UploadAvatarAsync(userId, file);
+            var user = await _userRepo.GetById(userId);
+            if (user == null)
+                throw new Exception("User không tồn tại");
 
-        //        user.AvtUrl = url;
-        //        user.UpdatedAt = DateTimeHelper.NowVN();
+            // 🔥 publicId cố định
+            var publicId = $"SportsBicycles/avatars/user_{userId}";
 
-        //        await _userRepo.Update(user);
-        //        await _uow.SaveChangeAsync();
+            // 🔥 XÓA AVATAR CŨ
+            await _cloudinary.DeleteImageAsync(publicId);
 
-        //        return (true, "Upload avatar thành công.", url);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return (false, ex.Message, null);
-        //    }
-        //}
+            // 🔥 UPLOAD MỚI
+            var avatarUrl = await _cloudinary.UploadAvatarAsync(userId, file);
+
+            // 🔥 UPDATE DB
+            user.AvtUrl = avatarUrl;
+
+            await _userRepo.Update(user);
+            await _uow.SaveChangeAsync();
+
+            return avatarUrl;
+        }
 
     }
 }

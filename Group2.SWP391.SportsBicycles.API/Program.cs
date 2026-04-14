@@ -1,4 +1,5 @@
-﻿using FirebaseAdmin;
+﻿using CloudinaryDotNet;
+using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
 using Group2.SWP391.SportsBicycles.Common.DTOs;
 using Group2.SWP391.SportsBicycles.DAL.Contract;
@@ -47,7 +48,32 @@ builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 builder.Services.AddScoped<IBuyerListingService, BuyerListingService>();
 builder.Services.AddScoped<IInspectorService, InspectorService>();
 builder.Services.AddScoped<ISellerListingService, SellerListingService>();
+builder.Services.AddHttpClient<IChatService, ChatService>();
 
+
+
+builder.Services.Configure<CloudinarySettings>(
+    builder.Configuration.GetSection("CloudinarySettings")
+);
+
+var config = builder.Configuration
+    .GetSection("CloudinarySettings")
+    .Get<CloudinarySettings>();
+
+if (config == null)
+    throw new Exception("Cloudinary config missing");
+
+var account = new Account(
+    config.CloudName,
+    config.ApiKey,
+    config.ApiSecret
+);
+
+var cloudinary = new Cloudinary(account);
+cloudinary.Api.Secure = true;
+
+builder.Services.AddSingleton(cloudinary);
+builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 
 builder.Services.AddHttpContextAccessor();
 

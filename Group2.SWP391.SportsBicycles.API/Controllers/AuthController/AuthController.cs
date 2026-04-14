@@ -190,5 +190,31 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.AuthController
                 role = result.Role
             });
         }
+        [HttpPost("upload-avatar")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadAvatar(IFormFile file)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+                if (string.IsNullOrEmpty(userIdClaim))
+                    return Unauthorized(new { message = "Unauthorized" });
+
+                var userId = Guid.Parse(userIdClaim);
+
+                var avatarUrl = await _authService.UploadAvatarAsync(userId, file);
+
+                return Ok(new
+                {
+                    message = "Upload avatar thành công",
+                    avatarUrl = avatarUrl
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }
