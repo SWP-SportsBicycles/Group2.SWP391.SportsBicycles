@@ -1,4 +1,5 @@
-﻿using FirebaseAdmin;
+﻿using CloudinaryDotNet;
+using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
 using Group2.SWP391.SportsBicycles.Common.DTOs;
 using Group2.SWP391.SportsBicycles.DAL.Contract;
@@ -19,15 +20,23 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")
     )
-);
+);  
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
-//var firebaseConfig = builder.Configuration.GetSection("Firebase").Get<Dictionary<string, object>>();
+var firebaseConfig = builder.Configuration.GetSection("Firebase").Get<Dictionary<string, object>>();
+var privateKey = firebaseConfig["private_key"].ToString();
 
-//FirebaseApp.Create(new AppOptions()
-//{
-//    Credential = GoogleCredential.FromJson(JsonSerializer.Serialize(firebaseConfig))
-//});
+// 🔥 FIX newline
+privateKey = privateKey.Replace("\\n", "\n");
+
+firebaseConfig["private_key"] = privateKey;
+
+FirebaseApp.Create(new AppOptions()
+{
+    Credential = GoogleCredential.FromJson(
+        JsonSerializer.Serialize(firebaseConfig)
+    )
+});
 // Add services to the container.
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddMemoryCache();
@@ -41,7 +50,32 @@ builder.Services.AddScoped<IInspectorService, InspectorService>();
 builder.Services.AddScoped<ISellerListingService, SellerListingService>();
 builder.Services.AddScoped<IAdminListingService, AdminListingService>();
 builder.Services.AddScoped<IBuyerOrderService, BuyerOrderService>();
+builder.Services.AddHttpClient<IChatService, ChatService>();
 
+
+
+builder.Services.Configure<CloudinarySettings>(
+    builder.Configuration.GetSection("CloudinarySettings")
+);
+
+var config = builder.Configuration
+    .GetSection("CloudinarySettings")
+    .Get<CloudinarySettings>();
+
+if (config == null)
+    throw new Exception("Cloudinary config missing");
+
+var account = new Account(
+    config.CloudName,
+    config.ApiKey,
+    config.ApiSecret
+);
+
+var cloudinary = new Cloudinary(account);
+cloudinary.Api.Secure = true;
+
+builder.Services.AddSingleton(cloudinary);
+builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 
 builder.Services.AddHttpContextAccessor();
 
@@ -130,5 +164,8 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+app.Urls.Add($"http://*:{port}");
 
 app.Run();
