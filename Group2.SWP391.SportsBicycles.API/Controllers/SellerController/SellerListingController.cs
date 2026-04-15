@@ -4,11 +4,13 @@ using Group2.SWP391.SportsBicycles.Services.Contract;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
 {
     [ApiController]
     [Route("api/seller-listing")]
+    [Authorize]
     public class SellerListingController : ControllerBase
     {
         private readonly ISellerListingService _service;
@@ -33,7 +35,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
 
         // ================= SUBMIT =================
         [HttpPost("{listingId}/submit")]
-        public async Task<IActionResult> Submit(Guid listingId)
+        public async Task<IActionResult> Submit([FromRoute] Guid listingId)
         {
             var result = await _service.SubmitForReviewAsync(GetUserId(), listingId);
             return HandleResult(result);
@@ -41,7 +43,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
 
         // ================= UPDATE =================
         [HttpPut("{listingId}")]
-        public async Task<IActionResult> Update(Guid listingId, [FromBody] ListingUpsertDTO dto)
+        public async Task<IActionResult> Update([FromRoute] Guid listingId, [FromBody] ListingUpsertDTO dto)
         {
             var result = await _service.UpdateAsync(GetUserId(), listingId, dto);
             return HandleResult(result);
@@ -49,7 +51,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
 
         // ================= DELETE =================
         [HttpDelete("{listingId}")]
-        public async Task<IActionResult> Delete(Guid listingId)
+        public async Task<IActionResult> Delete([FromRoute] Guid listingId)
         {
             var result = await _service.DeleteAsync(GetUserId(), listingId);
             return HandleResult(result);
@@ -67,7 +69,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
 
         // ================= GET DETAIL =================
         [HttpGet("{listingId}")]
-        public async Task<IActionResult> GetDetail(Guid listingId)
+        public async Task<IActionResult> GetDetail([FromRoute] Guid listingId)
         {
             var result = await _service.GetDetailsAsync(GetUserId(), listingId);
             return HandleResult(result);
@@ -75,17 +77,9 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
 
         // ================= WITHDRAW =================
         [HttpPost("{listingId}/withdraw")]
-        public async Task<IActionResult> Withdraw(Guid listingId)
+        public async Task<IActionResult> Withdraw([FromRoute] Guid listingId)
         {
             var result = await _service.WithdrawAsync(GetUserId(), listingId);
-            return HandleResult(result);
-        }
-
-        // ================= VALIDATE =================
-        [HttpGet("{listingId}/validate")]
-        public async Task<IActionResult> Validate(Guid listingId)
-        {
-            var result = await _service.ValidateListingAsync(GetUserId(), listingId);
             return HandleResult(result);
         }
 
@@ -94,10 +88,11 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
         {
             if (result == null)
             {
-                return StatusCode(500, new ResponseDTO
+                return StatusCode(StatusCodes.Status500InternalServerError, new ResponseDTO
                 {
                     IsSucess = false,
-                    BusinessCode = BusinessCode.INTERNAL_ERROR
+                    BusinessCode = BusinessCode.INTERNAL_ERROR,
+                    Message = "Lỗi hệ thống"
                 });
             }
 
@@ -110,11 +105,19 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
                     BusinessCode.INVALID_INPUT
                     or BusinessCode.INVALID_DATA
                     or BusinessCode.INVALID_ACTION
-                    or BusinessCode.VALIDATION_ERROR => BadRequest(result),
+                    or BusinessCode.VALIDATION_ERROR
+                    or BusinessCode.VALIDATION_FAILED => BadRequest(result),
 
-                    BusinessCode.ACCESS_DENIED => Forbid(),
+                    BusinessCode.AUTH_NOT_FOUND
+                    or BusinessCode.WRONG_PASSWORD => Unauthorized(result),
 
-                    _ => StatusCode(500, result)
+                    BusinessCode.ACCESS_DENIED
+                    or BusinessCode.PERMISSION_DENIED => StatusCode(StatusCodes.Status403Forbidden, result),
+
+                    BusinessCode.EXCEPTION
+                    or BusinessCode.INTERNAL_ERROR => StatusCode(StatusCodes.Status500InternalServerError, result),
+
+                    _ => BadRequest(result)
                 };
             }
 

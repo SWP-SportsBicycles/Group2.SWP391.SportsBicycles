@@ -15,8 +15,7 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
         public string Description { get; set; } = default!;
         public ListingStatusEnum Status { get; set; }
 
-        // ✅ NEW (P0)
-        public string SerialNumber { get; set; } = default!;
+      
 
         // ✅ NEW (P0)
         public string City { get; set; } = default!; // HN / HCM / DN

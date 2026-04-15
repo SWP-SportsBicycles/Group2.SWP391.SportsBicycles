@@ -39,6 +39,8 @@ builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 builder.Services.AddScoped<IBuyerListingService, BuyerListingService>();
 builder.Services.AddScoped<IInspectorService, InspectorService>();
 builder.Services.AddScoped<ISellerListingService, SellerListingService>();
+builder.Services.AddScoped<IAdminListingService, AdminListingService>();
+builder.Services.AddScoped<IBuyerOrderService, BuyerOrderService>();
 
 
 builder.Services.AddHttpContextAccessor();

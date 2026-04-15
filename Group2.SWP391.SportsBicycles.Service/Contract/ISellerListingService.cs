@@ -22,16 +22,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
         Task<ResponseDTO> DeleteAsync(Guid sellerId, Guid listingId);
 
         // ================= GET =================
-        Task<ResponseDTO> GetByIdAsync(Guid sellerId, Guid listingId);
-
         Task<ResponseDTO> GetMyListingsAsync(Guid sellerId, int pageNumber, int pageSize);
 
         Task<ResponseDTO> GetDetailsAsync(Guid sellerId, Guid listingId);
 
         // ================= WITHDRAW =================
         Task<ResponseDTO> WithdrawAsync(Guid sellerId, Guid listingId);
-
-        // ================= VALIDATE =================
-        Task<ResponseDTO> ValidateListingAsync(Guid sellerId, Guid listingId);
     }
 }
