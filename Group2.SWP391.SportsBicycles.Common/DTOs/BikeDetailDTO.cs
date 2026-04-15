@@ -9,12 +9,14 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
     public class BikeDetailDTO
     {
         public Guid BikeId { get; set; }
-        public string Brand { get; set; } = default!;
-        public string Category { get; set; } = default!;
-        public decimal Price { get; set; }
 
+        public string SerialNumber { get; set; } = default!;
+        public string Category { get; set; } = default!;
+        public string Brand { get; set; } = default!;
         public string FrameSize { get; set; } = default!;
         public string FrameMaterial { get; set; } = default!;
+        public string Condition { get; set; } = default!;
+
         public string Paint { get; set; } = default!;
         public string Groupset { get; set; } = default!;
         public string Operating { get; set; } = default!;
@@ -22,7 +24,8 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public string BrakeType { get; set; } = default!;
         public string Overall { get; set; } = default!;
 
-        public bool IsInspected { get; set; }
-        public List<MediaDTO> Medias { get; set; } = new();
+        public decimal Price { get; set; }
+        public string City { get; set; } = default!;
+        public string Status { get; set; } = default!;
     }
 }

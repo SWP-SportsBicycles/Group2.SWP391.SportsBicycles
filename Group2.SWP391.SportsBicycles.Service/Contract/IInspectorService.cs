@@ -17,7 +17,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
         Task<ResponseDTO> SubmitInspectionAsync(Guid inspectorId, Guid orderId, InspectionDTO dto);
 
         // ================= HISTORY =================
-        Task<ResponseDTO> GetInspectionHistoryAsync(int pageNumber, int pageSize);
+        Task<ResponseDTO> GetInspectionHistoryAsync(Guid inspectorId, int pageNumber, int pageSize);
 
         Task<ResponseDTO> GetInspectionHistoryDetailAsync(Guid inspectionId);
     }

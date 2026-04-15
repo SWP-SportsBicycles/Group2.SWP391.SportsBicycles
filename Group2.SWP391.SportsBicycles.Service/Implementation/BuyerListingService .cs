@@ -3,29 +3,26 @@ using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
 using Group2.SWP391.SportsBicycles.Common.Enums;
 using Group2.SWP391.SportsBicycles.DAL.Contract;
 using Group2.SWP391.SportsBicycles.DAL.Models;
+using Group2.SWP391.SportsBicycles.Services.Contract;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using Group2.SWP391.SportsBicycles.Services.Contract;
 
 public class BuyerListingService : IBuyerListingService
 {
     private readonly IGenericRepository<Bike> _bikeRepo;
     private readonly IGenericRepository<Listing> _listingRepo;
-    private readonly IGenericRepository<Wishlist> _wishlistRepo;
     private readonly IGenericRepository<Order> _orderRepo;
     private readonly IHttpContextAccessor _http;
 
     public BuyerListingService(
         IGenericRepository<Bike> bikeRepo,
         IGenericRepository<Listing> listingRepo,
-        IGenericRepository<Wishlist> wishlistRepo,
         IGenericRepository<Order> orderRepo,
         IHttpContextAccessor http)
     {
         _bikeRepo = bikeRepo;
         _listingRepo = listingRepo;
-        _wishlistRepo = wishlistRepo;
         _orderRepo = orderRepo;
         _http = http;
     }
@@ -34,14 +31,44 @@ public class BuyerListingService : IBuyerListingService
     private Guid? GetUserId()
     {
         var id = _http.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
-        return string.IsNullOrEmpty(id) ? null : Guid.Parse(id);
+        return string.IsNullOrWhiteSpace(id) ? null : Guid.Parse(id);
     }
 
-    private static ResponseDTO Fail(BusinessCode code, string msg)
-        => new() { IsSucess = false, BusinessCode = code, Message = msg };
+    private static ResponseDTO Success(object? data = null)
+        => new()
+        {
+            IsSucess = true,
+            BusinessCode = BusinessCode.GET_DATA_SUCCESSFULLY,
+            Data = data
+        };
 
-    // ================= ACTIVE LISTING =================
-    private async Task<List<Guid>> GetActiveListingIds()
+    private static ResponseDTO Fail(BusinessCode code, string msg)
+        => new()
+        {
+            IsSucess = false,
+            BusinessCode = code,
+            Message = msg
+        };
+
+    private static bool IsOrderActiveForListing(OrderStatusEnum status)
+    {
+        return status == OrderStatusEnum.Pending
+            || status == OrderStatusEnum.Paid
+            || status == OrderStatusEnum.Confirmed
+            || status == OrderStatusEnum.Shipping;
+    }
+
+    private static bool IsBuyerAllowedToViewSellerPII(OrderStatusEnum status)
+    {
+        // Theo SRS: chỉ lộ PII sau khi cọc/đơn đã được xác nhận hợp lệ.
+        // Với enum hiện tại của bạn, dùng Paid trở lên là hợp lý nhất.
+        return status == OrderStatusEnum.Paid
+            || status == OrderStatusEnum.Confirmed
+            || status == OrderStatusEnum.Shipping
+            || status == OrderStatusEnum.Completed;
+    }
+
+    private async Task<List<Guid>> GetActiveListingIdsAsync()
     {
         return await _orderRepo.AsQueryable()
             .Include(o => o.OrderItems)
@@ -50,128 +77,133 @@ public class BuyerListingService : IBuyerListingService
                 o.Status == OrderStatusEnum.Pending ||
                 o.Status == OrderStatusEnum.Paid ||
                 o.Status == OrderStatusEnum.Confirmed ||
-                o.Status == OrderStatusEnum.Shipping
-            )
+                o.Status == OrderStatusEnum.Shipping)
             .SelectMany(o => o.OrderItems)
+            .Where(oi => oi.Bike != null)
             .Select(oi => oi.Bike.ListingId)
             .Distinct()
             .ToListAsync();
     }
 
-    // ================= GET ALL =================
+    private IQueryable<Bike> BuildPublicBuyerQuery(List<Guid> activeListingIds)
+    {
+        return _bikeRepo.AsQueryable()
+            .Include(b => b.Listing)
+                .ThenInclude(l => l.User)
+            .Include(b => b.Medias)
+            .Include(b => b.Wishlists)
+            .Include(b => b.Inspection)
+            .Where(b =>
+                b.Listing != null &&
+                b.Status == BikeStatusEnum.Available &&
+                b.Listing.Status == ListingStatusEnum.Published &&
+                !activeListingIds.Contains(b.ListingId));
+    }
+
+    // ================= LIST =================
     public async Task<ResponseDTO> GetAllAsync(int pageNumber, int pageSize)
     {
         if (pageNumber <= 0 || pageSize <= 0)
             return Fail(BusinessCode.INVALID_INPUT, "Invalid pagination");
 
         var currentUserId = GetUserId();
+        var activeListingIds = await GetActiveListingIdsAsync();
 
-        var activeListingIds = await GetActiveListingIds();
+        var query = BuildPublicBuyerQuery(activeListingIds);
 
-        var query = _bikeRepo.AsQueryable()
-            .Include(b => b.Listing)
-            .Include(b => b.Medias)
-            .Include(b => b.Wishlists)
-            .Include(b => b.Inspection)
-            .Where(b =>
-                b.Status == BikeStatusEnum.Available &&
-                b.Listing.Status == ListingStatusEnum.Published &&
-                !activeListingIds.Contains(b.ListingId)
-            );
-
-        var total = await query.CountAsync();
+        var totalItems = await query.CountAsync();
 
         var bikes = await query
+            .OrderByDescending(b => b.Listing.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
 
-        var data = bikes.Select(b => new BuyerBikeListingDTO
+        var items = bikes.Select(b => new BuyerBikeListingDTO
         {
             BikeId = b.Id,
             ListingId = b.ListingId,
-            Title = b.Listing.Title,
+            Title = b.Listing?.Title ?? string.Empty,
             Price = b.Price,
             Brand = b.Brand,
             Category = b.Category,
-            Thumbnail = b.Medias.FirstOrDefault()?.Image ?? "",
+            Thumbnail = b.Medias?
+                .OrderBy(m => m.Type)
+                .Select(m => m.Image)
+                .FirstOrDefault() ?? string.Empty,
             Overall = b.Overall,
-            IsInspected = b.Inspection != null && b.Inspection.Score >= 3,
+            IsInspected = b.Inspection != null,
             IsWishlisted = currentUserId != null &&
-                           b.Wishlists.Any(w => w.UserId == currentUserId)
-        });
+                           b.Wishlists != null &&
+                           b.Wishlists.Any(w => w.UserId == currentUserId.Value)
+        }).ToList();
 
-        return new ResponseDTO
+        return Success(new
         {
-            IsSucess = true,
-            BusinessCode = BusinessCode.GET_DATA_SUCCESSFULLY,
-            Data = new
-            {
-                Items = data,
-                TotalPages = (int)Math.Ceiling(total / (double)pageSize)
-            }
-        };
+            Items = items,
+            TotalItems = totalItems,
+            TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize),
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        });
     }
 
     // ================= DETAIL =================
     public async Task<ResponseDTO> GetDetail(Guid listingId)
     {
-        var listing = await _listingRepo.GetByExpression(
-            l => l.Id == listingId,
-            l => l.User,
-            l => l.Bikes
-        );
+        var listing = await _listingRepo.AsQueryable()
+            .Include(l => l.User)
+            .Include(l => l.Bikes)
+                .ThenInclude(b => b.Medias)
+            .Include(l => l.Bikes)
+                .ThenInclude(b => b.Inspection)
+            .FirstOrDefaultAsync(l =>
+                l.Id == listingId &&
+                l.Status == ListingStatusEnum.Published);
 
         if (listing == null)
             return Fail(BusinessCode.DATA_NOT_FOUND, "Listing không tồn tại");
 
         var currentUserId = GetUserId();
+        var activeListingIds = await GetActiveListingIdsAsync();
 
-        bool hasDeposited = false;
+        // Nếu listing đang có giao dịch active thì vẫn có thể xem detail,
+        // nhưng không nên cho đặt mua mới ở tầng khác.
+        // Ở đây chỉ cần xử lý đúng phần hiển thị.
+        bool hasQualifiedOrder = false;
 
         if (currentUserId != null)
         {
-            hasDeposited = await _orderRepo.AsQueryable()
-     .Include(o => o.OrderItems)
-         .ThenInclude(oi => oi.Bike)
-     .AnyAsync(o =>
-         o.UserId == currentUserId &&
-         (
-             o.Status == OrderStatusEnum.Paid ||
-             o.Status == OrderStatusEnum.Confirmed ||
-             o.Status == OrderStatusEnum.Shipping ||
-             o.Status == OrderStatusEnum.Completed
-         ) &&
-         o.OrderItems.Any(oi => oi.Bike.ListingId == listingId)
-     );
+            hasQualifiedOrder = await _orderRepo.AsQueryable()
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Bike)
+                .AnyAsync(o =>
+                    o.UserId == currentUserId.Value &&
+                    IsBuyerAllowedToViewSellerPII(o.Status) &&
+                    o.OrderItems.Any(oi => oi.Bike.ListingId == listingId));
         }
 
-        var bikes = await _bikeRepo.GetListByExpression(b => b.ListingId == listingId);
-
-        return new ResponseDTO
+        var bikes = listing.Bikes?.Select(b => new BikeDetailDTO
         {
-            IsSucess = true,
-            BusinessCode = BusinessCode.GET_DATA_SUCCESSFULLY,
-            Data = new BuyerListingDetailDTO
-            {
-                ListingId = listing.Id,
-                Title = listing.Title,
-                Description = listing.Description,
+            BikeId = b.Id,
+            Brand = b.Brand,
+            Category = b.Category,
+            Price = b.Price,
+            FrameSize = b.FrameSize,
+            Overall = b.Overall
+        }).ToList() ?? new List<BikeDetailDTO>();
 
-                // 🔐 PII
-                SellerName = hasDeposited ? listing.User.FullName : null,
+        return Success(new BuyerListingDetailDTO
+        {
+            ListingId = listing.Id,
+            Title = listing.Title,
+            Description = listing.Description,
 
-                Bikes = bikes.Select(b => new BikeDetailDTO
-                {
-                    BikeId = b.Id,
-                    Brand = b.Brand,
-                    Category = b.Category,
-                    Price = b.Price,
-                    FrameSize = b.FrameSize,
-                    Overall = b.Overall
-                }).ToList()
-            }
-        };
+            // Theo SRS: chỉ lộ thông tin seller sau khi buyer có order/cọc hợp lệ
+            SellerName = hasQualifiedOrder ? listing.User?.FullName : null,
+
+            Bikes = bikes
+        });
     }
 
     // ================= SEARCH =================
@@ -186,24 +218,37 @@ public class BuyerListingService : IBuyerListingService
         int pageNumber,
         int pageSize)
     {
-        var activeListingIds = await GetActiveListingIds();
+        if (pageNumber <= 0 || pageSize <= 0)
+            return Fail(BusinessCode.INVALID_INPUT, "Invalid pagination");
 
-        var query = _bikeRepo.AsQueryable()
-            .Include(b => b.Listing)
-            .Where(b =>
-                b.Status == BikeStatusEnum.Available &&
-                b.Listing.Status == ListingStatusEnum.Published &&
-                !activeListingIds.Contains(b.ListingId)
-            );
+        if (minPrice.HasValue && maxPrice.HasValue && minPrice > maxPrice)
+            return Fail(BusinessCode.INVALID_INPUT, "Khoảng giá không hợp lệ");
+
+        var currentUserId = GetUserId();
+        var activeListingIds = await GetActiveListingIdsAsync();
+
+        var query = BuildPublicBuyerQuery(activeListingIds);
 
         if (!string.IsNullOrWhiteSpace(keyword))
-            query = query.Where(b => b.Listing.Title.Contains(keyword));
+        {
+            keyword = keyword.Trim();
+            query = query.Where(b =>
+                b.Listing.Title.Contains(keyword) ||
+                b.Brand.Contains(keyword) ||
+                b.Category.Contains(keyword));
+        }
 
         if (!string.IsNullOrWhiteSpace(brand))
+        {
+            brand = brand.Trim();
             query = query.Where(b => b.Brand == brand);
+        }
 
         if (!string.IsNullOrWhiteSpace(category))
+        {
+            category = category.Trim();
             query = query.Where(b => b.Category == category);
+        }
 
         if (minPrice.HasValue)
             query = query.Where(b => b.Price >= minPrice.Value);
@@ -212,115 +257,55 @@ public class BuyerListingService : IBuyerListingService
             query = query.Where(b => b.Price <= maxPrice.Value);
 
         if (!string.IsNullOrWhiteSpace(frameSize))
+        {
+            frameSize = frameSize.Trim();
             query = query.Where(b => b.FrameSize == frameSize);
+        }
 
         if (!string.IsNullOrWhiteSpace(condition))
+        {
+            condition = condition.Trim();
             query = query.Where(b => b.Condition == condition);
+        }
 
-        var total = await query.CountAsync();
+        var totalItems = await query.CountAsync();
 
-        var data = await query
+        var bikes = await query
+            .OrderByDescending(b => b.Listing.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(b => new BuyerBikeListingDTO
-            {
-                BikeId = b.Id,
-                ListingId = b.ListingId,
-                Title = b.Listing.Title,
-                Price = b.Price
-            })
             .ToListAsync();
 
-        return new ResponseDTO
+        var items = bikes.Select(b => new BuyerBikeListingDTO
         {
-            IsSucess = true,
-            BusinessCode = BusinessCode.GET_DATA_SUCCESSFULLY,
-            Data = new
-            {
-                Items = data,
-                Total = total
-            }
-        };
-    }
+            BikeId = b.Id,
+            ListingId = b.ListingId,
+            Title = b.Listing?.Title ?? string.Empty,
+            Price = b.Price,
+            Brand = b.Brand,
+            Category = b.Category,
+            Thumbnail = b.Medias?
+                .OrderBy(m => m.Type)
+                .Select(m => m.Image)
+                .FirstOrDefault() ?? string.Empty,
+            Overall = b.Overall,
+            IsInspected = b.Inspection != null,
+            IsWishlisted = currentUserId != null &&
+                           b.Wishlists != null &&
+                           b.Wishlists.Any(w => w.UserId == currentUserId.Value)
+        }).ToList();
 
-    // ================= WISHLIST =================
-    public async Task<ResponseDTO> AddToWishlistAsync(Guid bikeId)
-    {
-        var userId = GetUserId();
-        if (userId == null)
-            return Fail(BusinessCode.ACCESS_DENIED, "Chưa đăng nhập");
-
-        var exists = await _wishlistRepo.AsQueryable()
-            .AnyAsync(x => x.UserId == userId && x.BikeId == bikeId);
-
-        if (exists)
-            return Fail(BusinessCode.DUPLICATE_DATA, "Đã tồn tại");
-
-        await _wishlistRepo.Insert(new Wishlist
+        return Success(new
         {
-            UserId = userId.Value,
-            BikeId = bikeId
+            Items = items,
+            TotalItems = totalItems,
+            TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize),
+            PageNumber = pageNumber,
+            PageSize = pageSize
         });
-
-        return new ResponseDTO
-        {
-            IsSucess = true,
-            BusinessCode = BusinessCode.CREATED_SUCCESSFULLY
-        };
     }
 
-    public async Task<ResponseDTO> RemoveFromWishlistAsync(Guid bikeId)
-    {
-        var userId = GetUserId();
-        if (userId == null)
-            return Fail(BusinessCode.ACCESS_DENIED, "Chưa đăng nhập");
+   
 
-        var item = await _wishlistRepo.GetFirstByExpression(
-            x => x.UserId == userId && x.BikeId == bikeId);
 
-        if (item == null)
-            return Fail(BusinessCode.DATA_NOT_FOUND, "Không tồn tại");
-
-        await _wishlistRepo.Delete(item);
-
-        return new ResponseDTO
-        {
-            IsSucess = true,
-            BusinessCode = BusinessCode.DELETE_SUCESSFULLY
-        };
-    }
-
-    public async Task<ResponseDTO> GetMyWishlistAsync(int pageNumber, int pageSize)
-    {
-        var userId = GetUserId();
-        if (userId == null)
-            return Fail(BusinessCode.ACCESS_DENIED, "Chưa đăng nhập");
-
-        var result = await _wishlistRepo.GetAllDataByExpression(
-            filter: w => w.UserId == userId,
-            pageNumber: pageNumber,
-            pageSize: pageSize,
-            includes: w => w.Bike
-        );
-
-        var data = (result.Items ?? new List<Wishlist>())
-            .Select(w => new BuyerBikeListingDTO
-            {
-                BikeId = w.BikeId,
-                ListingId = w.Bike.ListingId,
-                Title = w.Bike.Listing.Title,
-                Price = w.Bike.Price
-            });
-
-        return new ResponseDTO
-        {
-            IsSucess = true,
-            BusinessCode = BusinessCode.GET_DATA_SUCCESSFULLY,
-            Data = new
-            {
-                Items = data,
-                TotalPages = result.TotalPages
-            }
-        };
-    }
 }

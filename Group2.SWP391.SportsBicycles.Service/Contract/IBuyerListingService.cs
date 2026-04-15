@@ -27,12 +27,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
             int pageNumber,
             int pageSize);
 
-        // ================= WISHLIST =================
-        Task<ResponseDTO> AddToWishlistAsync(Guid bikeId);
-
-        Task<ResponseDTO> RemoveFromWishlistAsync(Guid bikeId);
-
-        Task<ResponseDTO> GetMyWishlistAsync(int pageNumber, int pageSize);
+       
+       
     }
 }
 
