@@ -26,6 +26,8 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
 
         public ICollection<Report> Reports { get; set; } = new List<Report>();
 
+        public Shipment? Shipment { get; set; }
+
         // 1-1 transaction
         public Transaction? Transaction { get; set; }
 
