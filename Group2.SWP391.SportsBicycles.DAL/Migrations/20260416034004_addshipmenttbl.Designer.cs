@@ -4,6 +4,7 @@ using Group2.SWP391.SportsBicycles.DAL.DB;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Group2.SWP391.SportsBicycles.DAL.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260416034004_addshipmenttbl")]
+    partial class addshipmenttbl
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -515,9 +518,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
 
                     b.Property<DateTime?>("DeliveredAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<decimal>("DistanceKm")
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("FailReason")
                         .HasColumnType("nvarchar(max)");

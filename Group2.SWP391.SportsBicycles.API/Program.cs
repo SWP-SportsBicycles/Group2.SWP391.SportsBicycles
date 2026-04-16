@@ -51,7 +51,8 @@ builder.Services.AddScoped<ISellerListingService, SellerListingService>();
 builder.Services.AddScoped<IAdminListingService, AdminListingService>();
 builder.Services.AddScoped<IBuyerOrderService, BuyerOrderService>();
 builder.Services.AddHttpClient<IChatService, ChatService>();
-
+builder.Services.AddScoped<IShipmentService, ShipmentService>();
+builder.Services.AddScoped<IShippingProviderClient, FakeShippingProviderClient>();
 
 
 builder.Services.Configure<CloudinarySettings>(
@@ -165,7 +166,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-app.Urls.Add($"http://*:{port}");
+//var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+//app.Urls.Add($"http://*:{port}");
 
 app.Run();
