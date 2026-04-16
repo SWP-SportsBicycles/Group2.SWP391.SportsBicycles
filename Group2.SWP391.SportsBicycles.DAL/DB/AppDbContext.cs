@@ -1,11 +1,9 @@
-﻿using Group2.SWP391.SportsBicycles.DAL.Models;
+using Group2.SWP391.SportsBicycles.Common.Enums;
+using Group2.SWP391.SportsBicycles.DAL.Models;
 using Microsoft.EntityFrameworkCore;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Group2.SWP391.SportsBicycles.DAL.DB
 {
@@ -26,19 +24,39 @@ namespace Group2.SWP391.SportsBicycles.DAL.DB
         public DbSet<OrderItem> OrderItems => Set<OrderItem>();
         public DbSet<Transaction> Transactions => Set<Transaction>();
         public DbSet<Review> Reviews => Set<Review>();
-
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
-
         public DbSet<Report> Reports => Set<Report>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // --------- Soft delete global filter cho mọi entity kế thừa BaseEntity ---------
+            var adminCreatedAt = new DateTime(2026, 4, 16, 0, 0, 0, DateTimeKind.Utc);
+            const string adminPasswordHash = "100000.c3BvcnRzYmljeWNsZXNfYWRtbg==.7sq8l4vR3XvM3Kd9VgB2WFSlMswRlh0p5APn353Us/s=";
+
+            // Soft delete global filter cho moi entity ke thua BaseEntity
             ApplySoftDeleteQueryFilter(modelBuilder);
 
-            // --------- Decimal precision (SQL Server) ---------
+            // Decimal precision (SQL Server)
             modelBuilder.Entity<User>().Property(x => x.WalletBalance).HasPrecision(18, 2);
+
+            // Seed admin account
+            modelBuilder.Entity<User>().HasData(new User
+            {
+                Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                Email = "admin@sportsbicycles.com",
+                FullName = "System Admin",
+                PhoneNumber = "0909000000",
+                Password = adminPasswordHash,
+                AvtUrl = null,
+                FirebaseUID = null,
+                Role = RoleEnum.ADMIN,
+                WalletBalance = 0m,
+                Status = UserStatusEnum.Active,
+                CreatedAt = adminCreatedAt,
+                UpdatedAt = adminCreatedAt,
+                IsDeleted = false
+            });
 
             modelBuilder.Entity<Bike>().Property(x => x.Price).HasPrecision(18, 2);
             modelBuilder.Entity<CartItem>().Property(x => x.UnitPrice).HasPrecision(18, 2);
@@ -207,7 +225,8 @@ namespace Group2.SWP391.SportsBicycles.DAL.DB
             modelBuilder.Entity<RefreshToken>()
                 .HasIndex(x => new { x.UserId, x.Revoked, x.ExpiredAt });
         }
-            private static void ApplySoftDeleteQueryFilter(ModelBuilder modelBuilder)
+
+        private static void ApplySoftDeleteQueryFilter(ModelBuilder modelBuilder)
         {
             var baseEntityType = typeof(BaseEntity);
 
@@ -226,5 +245,4 @@ namespace Group2.SWP391.SportsBicycles.DAL.DB
             }
         }
     }
-    }
-
+}
