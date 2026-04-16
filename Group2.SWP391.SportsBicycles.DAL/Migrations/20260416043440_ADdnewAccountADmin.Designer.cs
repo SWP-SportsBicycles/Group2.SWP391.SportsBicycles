@@ -4,6 +4,7 @@ using Group2.SWP391.SportsBicycles.DAL.DB;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Group2.SWP391.SportsBicycles.DAL.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260416043440_ADdnewAccountADmin")]
+    partial class ADdnewAccountADmin
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -504,135 +507,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
                     b.ToTable("Reviews");
                 });
 
-            modelBuilder.Entity("Group2.SWP391.SportsBicycles.DAL.Models.Shipment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("DeliveredAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("DistanceKm")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("FailReason")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("FailedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Note")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid>("OrderId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("PickupAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ProviderOrderCode")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ReceiverAddress")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ReceiverName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ReceiverPhone")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SenderAddress")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SenderName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SenderPhone")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ShipmentCode")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<decimal>("ShippingFee")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("ShippingProvider")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrderId")
-                        .IsUnique();
-
-                    b.ToTable("Shipment");
-                });
-
-            modelBuilder.Entity("Group2.SWP391.SportsBicycles.DAL.Models.ShipmentTracking", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("EventTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Location")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("RawStatus")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid>("ShipmentId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ShipmentId");
-
-                    b.ToTable("ShipmentTracking");
-                });
-
             modelBuilder.Entity("Group2.SWP391.SportsBicycles.DAL.Models.Transaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -944,28 +818,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("Group2.SWP391.SportsBicycles.DAL.Models.Shipment", b =>
-                {
-                    b.HasOne("Group2.SWP391.SportsBicycles.DAL.Models.Order", "Order")
-                        .WithOne("Shipment")
-                        .HasForeignKey("Group2.SWP391.SportsBicycles.DAL.Models.Shipment", "OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Order");
-                });
-
-            modelBuilder.Entity("Group2.SWP391.SportsBicycles.DAL.Models.ShipmentTracking", b =>
-                {
-                    b.HasOne("Group2.SWP391.SportsBicycles.DAL.Models.Shipment", "Shipment")
-                        .WithMany("Trackings")
-                        .HasForeignKey("ShipmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Shipment");
-                });
-
             modelBuilder.Entity("Group2.SWP391.SportsBicycles.DAL.Models.Transaction", b =>
                 {
                     b.HasOne("Group2.SWP391.SportsBicycles.DAL.Models.Order", "Order")
@@ -1042,19 +894,12 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
 
                     b.Navigation("Review");
 
-                    b.Navigation("Shipment");
-
                     b.Navigation("Transaction");
                 });
 
             modelBuilder.Entity("Group2.SWP391.SportsBicycles.DAL.Models.Policy", b =>
                 {
                     b.Navigation("Transactions");
-                });
-
-            modelBuilder.Entity("Group2.SWP391.SportsBicycles.DAL.Models.Shipment", b =>
-                {
-                    b.Navigation("Trackings");
                 });
 
             modelBuilder.Entity("Group2.SWP391.SportsBicycles.DAL.Models.User", b =>
