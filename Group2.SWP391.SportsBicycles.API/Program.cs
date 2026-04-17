@@ -77,12 +77,15 @@ builder.Services.AddScoped<IAdminListingService, AdminListingService>();
 builder.Services.AddScoped<IBuyerOrderService, BuyerOrderService>();
 builder.Services.AddHttpClient<IChatService, ChatService>();
 builder.Services.AddScoped<IShipmentService, ShipmentService>();
-builder.Services.AddScoped<IShippingProviderClient, FakeShippingProviderClient>();
+builder.Services.AddHttpClient<IShippingProviderClient, GhnShippingProviderClient>();
 
 
-try
-{
-    Console.WriteLine("☁️ INIT CLOUDINARY...");
+builder.Services.Configure<CloudinarySettings>(
+    builder.Configuration.GetSection("CloudinarySettings")
+);
+builder.Services.Configure<GhnSettings>(
+    builder.Configuration.GetSection("GHN"));
+
 
     var config = builder.Configuration
         .GetSection("CloudinarySettings")
