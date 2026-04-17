@@ -77,14 +77,23 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (existed != null)
                 return new SignUpResult { Success = false, Message = "Email này đã tồn tại." };
 
+            if (dto.Role == RoleEnum.ADMIN || dto.Role == RoleEnum.INSPECTOR)
+            {
+                return new SignUpResult
+                {
+                    Success = false,
+                    Message = "Không được phép đăng ký role này."
+                };
+            }
+
             var user = new User
             {
                 Id = Guid.NewGuid(),
                 FullName = dto.FullName.Trim(),
                 PhoneNumber = string.IsNullOrWhiteSpace(dto.PhoneNumber) ? null : dto.PhoneNumber.Trim(),
                 Email = email,
-                Password = PasswordHasher.Hash(dto.Password),
-                Role = dto.Role,
+                Password = HashHelper.Hash(dto.Password),
+                Role = dto.Role == RoleEnum.SELLER ? RoleEnum.SELLER : RoleEnum.BUYER,  
                 Status = UserStatusEnum.InActive,
                 WalletBalance = 0m
             };
@@ -160,7 +169,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (user.Status == UserStatusEnum.Banned)
                 return new LoginResult { Success = false, Message = "Tài khoản đã bị khóa." };
 
-            if (!PasswordHasher.Verify(request.Password, user.Password))
+            if (!HashHelper.Verify(request.Password, user.Password))
                 return new LoginResult { Success = false, Message = "Mật khẩu không đúng." };
 
             var oldTokens = await _refreshRepo.GetAllDataByExpression(
@@ -486,7 +495,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (string.IsNullOrWhiteSpace(user.Password))
                 return (false, "Tài khoản này đăng nhập bằng Google, không thể đổi mật khẩu theo cách này.");
 
-            if (!PasswordHasher.Verify(dto.CurrentPassword, user.Password))
+            if (!HashHelper.Verify(dto.CurrentPassword, user.Password))
                 return (false, "Mật khẩu hiện tại không đúng.");
 
             if (dto.NewPassword != dto.ConfirmPassword)
@@ -495,7 +504,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (dto.CurrentPassword == dto.NewPassword)
                 return (false, "Mật khẩu mới không được trùng với mật khẩu hiện tại.");
 
-            user.Password = PasswordHasher.Hash(dto.NewPassword);
+            user.Password = HashHelper.Hash(dto.NewPassword);
 
             await _userRepo.Update(user);
             await _uow.SaveChangeAsync();
@@ -558,7 +567,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (string.IsNullOrWhiteSpace(user.Password))
                 return (false, "Tài khoản này đăng nhập bằng Google, không thể đặt lại mật khẩu theo cách này.");
 
-            user.Password = PasswordHasher.Hash(dto.NewPassword);
+            user.Password = HashHelper.Hash(dto.NewPassword);
 
             await _userRepo.Update(user);
 
@@ -630,5 +639,45 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             return avatarUrl;
         }
 
+        public async Task<(bool Success, string Message)> CreateInspectorAsync(CreateUserByAdminDto dto)
+        {
+            var email = dto.Email.Trim().ToLower();
+
+            // check email tồn tại
+            var existed = await _userRepo.GetFirstByExpression(u => u.Email == email);
+            if (existed != null)
+                return (false, "Email đã tồn tại.");
+
+            if (string.IsNullOrWhiteSpace(dto.FullName) ||
+                dto.FullName.Trim().ToLower() == "string" ||
+                dto.FullName.All(char.IsDigit))
+            {
+                return (false, "FullName không hợp lệ.");
+            }
+            // check phone
+            if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
+            {
+                var existedPhone = await _userRepo.GetFirstByExpression(u => u.PhoneNumber == dto.PhoneNumber);
+                if (existedPhone != null)
+                    return (false, "Số điện thoại đã tồn tại.");
+            }
+
+            var user = new User
+            {
+                Id = Guid.NewGuid(),
+                Email = email,
+                FullName = dto.FullName.Trim(),
+                PhoneNumber = dto.PhoneNumber,
+                Password = HashHelper.Hash(dto.Password),
+                Role = RoleEnum.INSPECTOR, // 🔥 HARD CODE
+                Status = UserStatusEnum.Active,
+                WalletBalance = 0m
+            };
+
+            await _userRepo.Insert(user);
+            await _uow.SaveChangeAsync();
+
+            return (true, "Tạo tài khoản INSPECTOR thành công.");
+        }
     }
 }

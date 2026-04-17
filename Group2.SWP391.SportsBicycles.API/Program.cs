@@ -23,20 +23,45 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 );  
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
-var firebaseConfig = builder.Configuration.GetSection("Firebase").Get<Dictionary<string, object>>();
-var privateKey = firebaseConfig["private_key"].ToString();
-
-// 🔥 FIX newline
-privateKey = privateKey.Replace("\\n", "\n");
-
-firebaseConfig["private_key"] = privateKey;
-
-FirebaseApp.Create(new AppOptions()
+try
 {
-    Credential = GoogleCredential.FromJson(
-        JsonSerializer.Serialize(firebaseConfig)
-    )
-});
+    Console.WriteLine("🔥 INIT FIREBASE...");
+
+    if (FirebaseApp.DefaultInstance == null)
+    {
+        var firebaseConfig = builder.Configuration
+            .GetSection("Firebase")
+            .Get<Dictionary<string, object>>();
+
+        if (firebaseConfig != null && firebaseConfig.ContainsKey("private_key"))
+        {
+            var privateKey = firebaseConfig["private_key"]?.ToString();
+
+            if (!string.IsNullOrEmpty(privateKey))
+            {
+                privateKey = privateKey.Replace("\\n", "\n");
+                firebaseConfig["private_key"] = privateKey;
+            }
+
+            FirebaseApp.Create(new AppOptions()
+            {
+                Credential = GoogleCredential.FromJson(
+                    JsonSerializer.Serialize(firebaseConfig)
+                )
+            });
+
+            Console.WriteLine("✅ Firebase OK");
+        }
+        else
+        {
+            Console.WriteLine("⚠️ Firebase config missing");
+        }
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine("❌ Firebase ERROR: " + ex.Message);
+}
 // Add services to the container.
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddMemoryCache();
@@ -54,28 +79,39 @@ builder.Services.AddHttpClient<IChatService, ChatService>();
 
 
 
-builder.Services.Configure<CloudinarySettings>(
-    builder.Configuration.GetSection("CloudinarySettings")
-);
+try
+{
+    Console.WriteLine("☁️ INIT CLOUDINARY...");
 
-var config = builder.Configuration
-    .GetSection("CloudinarySettings")
-    .Get<CloudinarySettings>();
+    var config = builder.Configuration
+        .GetSection("CloudinarySettings")
+        .Get<CloudinarySettings>();
 
-if (config == null)
-    throw new Exception("Cloudinary config missing");
+    if (config != null)
+    {
+        var account = new Account(
+            config.CloudName,
+            config.ApiKey,
+            config.ApiSecret
+        );
 
-var account = new Account(
-    config.CloudName,
-    config.ApiKey,
-    config.ApiSecret
-);
+        var cloudinary = new Cloudinary(account);
+        cloudinary.Api.Secure = true;
 
-var cloudinary = new Cloudinary(account);
-cloudinary.Api.Secure = true;
+        builder.Services.AddSingleton(cloudinary);
+        builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 
-builder.Services.AddSingleton(cloudinary);
-builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
+        Console.WriteLine("✅ Cloudinary OK");
+    }
+    else
+    {
+        Console.WriteLine("⚠️ Cloudinary config missing");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine("❌ Cloudinary ERROR: " + ex.Message);
+}
 
 builder.Services.AddHttpContextAccessor();
 
@@ -153,18 +189,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
 
-app.UseAuthentication();
+
 
 app.MapControllers();
 
