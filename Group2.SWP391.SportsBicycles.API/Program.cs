@@ -79,14 +79,15 @@ builder.Services.AddHttpClient<IChatService, ChatService>();
 builder.Services.AddScoped<IShipmentService, ShipmentService>();
 builder.Services.AddHttpClient<IShippingProviderClient, GhnShippingProviderClient>();
 
+builder.Services.Configure<GhnSettings>(
+    builder.Configuration.GetSection("GHN"));
 
 builder.Services.Configure<CloudinarySettings>(
     builder.Configuration.GetSection("CloudinarySettings")
 );
-builder.Services.Configure<GhnSettings>(
-    builder.Configuration.GetSection("GHN"));
 
-
+try
+{
     var config = builder.Configuration
         .GetSection("CloudinarySettings")
         .Get<CloudinarySettings>();
