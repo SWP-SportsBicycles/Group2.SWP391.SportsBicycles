@@ -76,7 +76,8 @@ builder.Services.AddScoped<ISellerListingService, SellerListingService>();
 builder.Services.AddScoped<IAdminListingService, AdminListingService>();
 builder.Services.AddScoped<IBuyerOrderService, BuyerOrderService>();
 builder.Services.AddHttpClient<IChatService, ChatService>();
-
+builder.Services.AddScoped<IShipmentService, ShipmentService>();
+builder.Services.AddScoped<IShippingProviderClient, FakeShippingProviderClient>();
 
 
 try
