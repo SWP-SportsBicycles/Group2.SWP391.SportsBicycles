@@ -13,10 +13,14 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
             string senderName,
             string senderPhone,
             string senderAddress,
+            int fromDistrictId,
+            string? fromWardCode,
             string receiverName,
             string receiverPhone,
             string receiverAddress,
-            decimal codAmount,
+            int toDistrictId,
+            string toWardCode,
+            int codAmount,
             string? note);
 
         Task<(bool IsSuccess, string? RawStatus, string? Description, string? Location, DateTime? EventTime, string? ErrorMessage)> TrackOrderAsync(

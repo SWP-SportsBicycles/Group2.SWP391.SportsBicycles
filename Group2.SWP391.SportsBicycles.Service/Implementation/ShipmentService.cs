@@ -111,6 +111,15 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (dto.DistanceKm <= 0)
                 return Fail(BusinessCode.INVALID_DATA, "Khoảng cách phải lớn hơn 0");
 
+            if (dto.FromDistrictId <= 0)
+                return Fail(BusinessCode.INVALID_DATA, "Thiếu FromDistrictId");
+
+            if (dto.ToDistrictId <= 0)
+                return Fail(BusinessCode.INVALID_DATA, "Thiếu ToDistrictId");
+
+            if (string.IsNullOrWhiteSpace(dto.ToWardCode))
+                return Fail(BusinessCode.INVALID_DATA, "Thiếu ToWardCode");
+
             var order = await _orderRepo.GetFirstByExpression(
                 o => o.Id == orderId,
                 o => o.Shipment);
@@ -129,14 +138,40 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             var shippingFee = ShippingFeeCalculator.Calculate(dto.DistanceKm);
 
+            // Gọi GHN trước, thành công rồi mới lưu DB
+            var providerResult = await _shippingProviderClient.CreateOrderAsync(
+                provider: dto.ShippingProvider.Trim(),
+                senderName: dto.SenderName.Trim(),
+                senderPhone: dto.SenderPhone.Trim(),
+                senderAddress: dto.SenderAddress.Trim(),
+                fromDistrictId: dto.FromDistrictId,
+                fromWardCode: dto.FromWardCode,
+
+                receiverName: order.ReceiverName,
+                receiverPhone: order.ReceiverPhone,
+                receiverAddress: order.ReceiverAddress,
+                toDistrictId: dto.ToDistrictId,
+                toWardCode: dto.ToWardCode,
+
+                codAmount: dto.CodAmount,
+                note: dto.Note
+            );
+
+            if (!providerResult.IsSuccess)
+            {
+                return Fail(
+                    BusinessCode.INVALID_ACTION,
+                    providerResult.ErrorMessage ?? "Tạo đơn vận chuyển thất bại");
+            }
+
             var shipment = new Shipment
             {
                 Id = Guid.NewGuid(),
                 OrderId = order.Id,
                 ShippingProvider = dto.ShippingProvider.Trim(),
                 ShipmentCode = GenerateShipmentCode(),
-                ProviderOrderCode = null,
-                Status = ShipmentStatusEnum.Pending,
+                ProviderOrderCode = providerResult.ProviderOrderCode,
+                Status = ShipmentStatusEnum.Created,
 
                 ShippingFee = shippingFee,
                 DistanceKm = dto.DistanceKm,
@@ -154,26 +189,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             await _shipmentRepo.Insert(shipment);
 
-            var providerResult = await _shippingProviderClient.CreateOrderAsync(
-                shipment.ShippingProvider,
-                shipment.SenderName,
-                shipment.SenderPhone,
-                shipment.SenderAddress,
-                shipment.ReceiverName,
-                shipment.ReceiverPhone,
-                shipment.ReceiverAddress,
-                shipment.ShippingFee,
-                shipment.Note
-            );
-
-            if (!providerResult.IsSuccess)
-                return Fail(
-                    BusinessCode.INVALID_ACTION,
-                    providerResult.ErrorMessage ?? "Tạo đơn vận chuyển thất bại");
-
-            shipment.ProviderOrderCode = providerResult.ProviderOrderCode;
-            shipment.Status = ShipmentStatusEnum.Created;
-
             await _trackingRepo.Insert(new ShipmentTracking
             {
                 Id = Guid.NewGuid(),
@@ -187,8 +202,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             order.Status = OrderStatusEnum.Shipping;
 
-            //await _shipmentRepo.Update(shipment);
-            //await _orderRepo.Update(order);
             await _uow.SaveChangeAsync();
 
             return Success(new
@@ -222,7 +235,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 ShippingProvider = shipment.ShippingProvider,
                 ShipmentCode = shipment.ShipmentCode,
                 ProviderOrderCode = shipment.ProviderOrderCode,
-                Status = shipment.Status,
+                Status = shipment.Status.ToString(),
                 ShippingFee = shipment.ShippingFee,
 
                 SenderName = shipment.SenderName,
@@ -237,7 +250,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     .OrderByDescending(t => t.EventTime)
                     .Select(t => new ShipmentTrackingDTO
                     {
-                        Status = t.Status,
+                        Status = t.Status.ToString(),
                         Title = t.Title,
                         Description = t.Description,
                         Location = t.Location,
