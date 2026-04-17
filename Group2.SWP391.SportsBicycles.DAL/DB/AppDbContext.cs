@@ -1,9 +1,12 @@
-using Group2.SWP391.SportsBicycles.Common.Enums;
+﻿using Group2.SWP391.SportsBicycles.Common.Enums;
 using Group2.SWP391.SportsBicycles.DAL.Models;
+
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Group2.SWP391.SportsBicycles.DAL.DB
 {
@@ -32,7 +35,13 @@ namespace Group2.SWP391.SportsBicycles.DAL.DB
             base.OnModelCreating(modelBuilder);
 
             var adminCreatedAt = new DateTime(2026, 4, 16, 0, 0, 0, DateTimeKind.Utc);
-            const string adminPasswordHash = "100000.c3BvcnRzYmljeWNsZXNfYWRtbg==.7sq8l4vR3XvM3Kd9VgB2WFSlMswRlh0p5APn353Us/s=";
+            string password = "Admin@123";
+
+            using var sha = SHA256.Create();
+            string adminPasswordHash = Convert.ToBase64String(
+                sha.ComputeHash(Encoding.UTF8.GetBytes(password))
+            );
+
 
             // Soft delete global filter cho moi entity ke thua BaseEntity
             ApplySoftDeleteQueryFilter(modelBuilder);
@@ -41,20 +50,20 @@ namespace Group2.SWP391.SportsBicycles.DAL.DB
             modelBuilder.Entity<User>().Property(x => x.WalletBalance).HasPrecision(18, 2);
 
             // Seed admin account
+            var adminId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
             modelBuilder.Entity<User>().HasData(new User
             {
-                Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                Id = adminId,
                 Email = "admin@sportsbicycles.com",
                 FullName = "System Admin",
                 PhoneNumber = "0909000000",
                 Password = adminPasswordHash,
-                AvtUrl = null,
-                FirebaseUID = null,
                 Role = RoleEnum.ADMIN,
                 WalletBalance = 0m,
                 Status = UserStatusEnum.Active,
-                CreatedAt = adminCreatedAt,
-                UpdatedAt = adminCreatedAt,
+                CreatedAt = new DateTime(2026, 1, 1),
+                UpdatedAt = new DateTime(2026, 1, 1),
                 IsDeleted = false
             });
 
