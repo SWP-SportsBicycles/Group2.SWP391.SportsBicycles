@@ -23,6 +23,7 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
         public Guid UserId { get; set; }
         public User User { get; set; } = default!;
 
+        public string? RejectReason { get; set; }
         public ICollection<Bike> Bikes { get; set; } = new List<Bike>();
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Group2.SWP391.SportsBicycles.Common.DTOs;
 using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
+using Group2.SWP391.SportsBicycles.Common.Enums;
 using Group2.SWP391.SportsBicycles.Services.Contract;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -9,7 +10,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.AdminController
 {
     [ApiController]
     [Route("api/admin-listing")]
-    [Authorize]
+    [Authorize(Roles = nameof(RoleEnum.ADMIN))]
     public class AdminListingController : ControllerBase
     {
         private readonly IAdminListingService _service;
@@ -32,6 +33,24 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.AdminController
         public async Task<IActionResult> Reject([FromRoute] Guid listingId, [FromBody] RejectListingDTO dto)
         {
             var result = await _service.RejectListingAsync(listingId, dto);
+            return HandleResult(result);
+        }
+        [HttpGet]
+        public async Task<IActionResult> GetList(
+    int page = 1,
+    int size = 10,
+    string? search = null,
+    string? sortBy = null,
+    bool isDesc = false)
+        {
+            var result = await _service.GetListingsAsync(page, size, search, sortBy, isDesc);
+            return HandleResult(result);
+        }
+
+        [HttpGet("{listingId}")]
+        public async Task<IActionResult> GetDetail(Guid listingId)
+        {
+            var result = await _service.GetDetailAsync(listingId);
             return HandleResult(result);
         }
 

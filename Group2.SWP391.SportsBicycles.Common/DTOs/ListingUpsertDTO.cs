@@ -1,4 +1,5 @@
 ﻿using Group2.SWP391.SportsBicycles.Common.Enums;
+using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -56,8 +57,7 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public decimal Price { get; set; }
         public string City { get; set; } = default!;
 
-        // ===== MEDIA =====
-        public List<MediaDTO> Medias { get; set; } = new();
+      
     }
 
     public class ListingDTO

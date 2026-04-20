@@ -12,20 +12,17 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
     {
         private readonly IGenericRepository<Listing> _listingRepo;
         private readonly IGenericRepository<Bike> _bikeRepo;
-        private readonly IGenericRepository<Media> _mediaRepo;
         private readonly IGenericRepository<Order> _orderRepo;
         private readonly IUnitOfWork _uow;
 
         public SellerListingService(
             IGenericRepository<Listing> listingRepo,
             IGenericRepository<Bike> bikeRepo,
-            IGenericRepository<Media> mediaRepo,
             IGenericRepository<Order> orderRepo,
             IUnitOfWork uow)
         {
             _listingRepo = listingRepo;
             _bikeRepo = bikeRepo;
-            _mediaRepo = mediaRepo;
             _orderRepo = orderRepo;
             _uow = uow;
         }
@@ -49,13 +46,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 Message = msg
             };
 
-        private static bool IsActiveOrderStatus(OrderStatusEnum status)
-        {
-            return status == OrderStatusEnum.Pending
-                || status == OrderStatusEnum.Paid
-                || status == OrderStatusEnum.Confirmed
-                || status == OrderStatusEnum.Shipping;
-        }
+        
 
         private static bool IsValidCity(string? city)
         {
@@ -68,22 +59,28 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Bike)
                 .AnyAsync(o =>
-                    IsActiveOrderStatus(o.Status) &&
-                    o.OrderItems.Any(oi => oi.Bike.ListingId == listingId));
+                    (
+                        o.Status == OrderStatusEnum.Pending ||
+                        o.Status == OrderStatusEnum.Paid ||
+                        o.Status == OrderStatusEnum.Confirmed ||
+                        o.Status == OrderStatusEnum.Shipping
+                    )
+                    &&
+                    o.OrderItems.Any(oi =>
+                        oi.Bike != null &&
+                        oi.Bike.ListingId == listingId
+                    )
+                );
         }
 
         private async Task<Bike?> GetBikeByListingIdAsync(Guid listingId)
         {
             return await _bikeRepo.AsQueryable()
-                .Include(b => b.Medias)
-                .FirstOrDefaultAsync(b => b.ListingId == listingId);
+    .Include(b => b.Medias.Where(m => !m.IsDeleted))
+    .FirstOrDefaultAsync(b => b.ListingId == listingId && !b.IsDeleted);
         }
 
-        private async Task<bool> HasGroupsetMediaAsync(Guid bikeId)
-        {
-            return await _mediaRepo.AsQueryable()
-                .AnyAsync(m => m.BikeId == bikeId && m.Type == MediaType.Groupset);
-        }
+       
 
         private ResponseDTO ValidateCreateOrUpdateDto(ListingCreateDTO dto)
         {
@@ -208,12 +205,20 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             var serialNumber = dto.SerialNumber.Trim();
 
-            // ===== CHECK DUPLICATE SERIAL =====
-            var isDuplicateSerial = await _bikeRepo.AsQueryable()
-                .AnyAsync(b => b.SerialNumber == serialNumber);
-
-            if (isDuplicateSerial)
+            // ❌ duplicate global
+            if (await _bikeRepo.AsQueryable().AnyAsync(b => b.SerialNumber == serialNumber))
                 return Fail(BusinessCode.DUPLICATE_DATA, "Serial number đã tồn tại");
+
+            // ❌ anti-spam cùng seller (trừ rejected)
+            var isSpam = await _listingRepo.AsQueryable()
+                .Include(l => l.Bikes)
+                .AnyAsync(l =>
+                    l.UserId == sellerId &&
+                    l.Bikes.Any(b => b.SerialNumber == serialNumber) &&
+                    l.Status != ListingStatusEnum.Rejected);
+
+            if (isSpam)
+                return Fail(BusinessCode.DUPLICATE_DATA, "Bạn đã đăng xe này rồi");
 
             // ===== CREATE LISTING =====
             var listing = new Listing
@@ -253,24 +258,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             await _bikeRepo.Insert(bike);
 
-            // ===== CREATE MEDIA =====
-            if (dto.Medias != null && dto.Medias.Any())
-            {
-                foreach (var m in dto.Medias)
-                {
-                    var media = new Media
-                    {
-                        Id = Guid.NewGuid(),
-                        BikeId = bike.Id,
-                        Image = m.Image,
-                        VideoUrl = m.VideoUrl,
-                        Type = m.Type
-                    };
-
-                    await _mediaRepo.Insert(media);
-                }
-            }
-
             await _uow.SaveChangeAsync();
 
             return Success(new { listingId = listing.Id }, BusinessCode.CREATED_SUCCESSFULLY);
@@ -280,7 +267,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         public async Task<ResponseDTO> SubmitForReviewAsync(Guid sellerId, Guid listingId)
         {
             var listing = await _listingRepo.GetByExpression(
-                x => x.Id == listingId && x.UserId == sellerId);
+        x => x.Id == listingId && x.UserId == sellerId);
 
             if (listing == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy listing");
@@ -288,10 +275,30 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (listing.Status != ListingStatusEnum.Draft)
                 return Fail(BusinessCode.INVALID_ACTION, "Chỉ draft mới được submit");
 
-            var bike = await GetBikeByListingIdAsync(listingId);
+            var bike = await _bikeRepo.AsQueryable()
+                .Include(b => b.Medias)
+                .FirstOrDefaultAsync(b => b.ListingId == listingId && !b.IsDeleted);
+
             if (bike == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy bike");
 
+            // 🔥 filter media hợp lệ
+            var medias = bike.Medias?
+                .Where(m => !m.IsDeleted)
+                .ToList();
+
+            if (medias == null || !medias.Any())
+                return Fail(BusinessCode.INVALID_DATA, "Phải upload ít nhất 1 ảnh hoặc video");
+
+            // ✅ phải có ít nhất 1 ảnh
+            if (!medias.Any(m => m.Image != null))
+                return Fail(BusinessCode.INVALID_DATA, "Phải có ít nhất 1 ảnh");
+
+            // OPTIONAL: bắt video
+            // if (!medias.Any(m => m.VideoUrl != null))
+            //     return Fail(BusinessCode.INVALID_DATA, "Phải có video");
+
+            // ===== CHECK FULL DATA =====
             if (string.IsNullOrWhiteSpace(listing.Title) ||
                 string.IsNullOrWhiteSpace(listing.Description) ||
                 string.IsNullOrWhiteSpace(bike.SerialNumber) ||
@@ -312,11 +319,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 return Fail(BusinessCode.INVALID_DATA, "Listing chưa đủ dữ liệu để submit");
             }
 
-            var hasGroupset = await HasGroupsetMediaAsync(bike.Id);
-            if (!hasGroupset)
-                return Fail(BusinessCode.INVALID_DATA, "Thiếu ảnh groupset");
-
+            // ===== SUBMIT =====
             listing.Status = ListingStatusEnum.PendingReview;
+
             await _uow.SaveChangeAsync();
 
             return Success(null, BusinessCode.UPDATE_SUCESSFULLY);
@@ -325,12 +330,12 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         // ================= UPDATE =================
         public async Task<ResponseDTO> UpdateAsync(Guid sellerId, Guid listingId, ListingUpsertDTO dto)
         {
+            var listing = await _listingRepo.GetByExpression(
+                 x => x.Id == listingId && x.UserId == sellerId);
+
             var validate = ValidateUpdateDto(dto);
             if (!validate.IsSucess)
                 return validate;
-
-            var listing = await _listingRepo.GetByExpression(
-                x => x.Id == listingId && x.UserId == sellerId);
 
             if (listing == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy listing");
@@ -339,15 +344,35 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (bike == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy bike");
 
-            var hasActiveOrder = await HasActiveOrderAsync(listingId);
-            if (hasActiveOrder)
+            if (await HasActiveOrderAsync(listingId))
                 return Fail(BusinessCode.INVALID_ACTION, "Đang có đơn active, không thể update");
 
             if (listing.Status == ListingStatusEnum.Withdrawn)
                 return Fail(BusinessCode.INVALID_ACTION, "Listing đã withdraw");
 
+            // ✅ check serial duplicate khi đổi
+            if (!string.Equals(bike.SerialNumber, dto.SerialNumber.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                var isDuplicate = await _bikeRepo.AsQueryable()
+                    .AnyAsync(b => b.SerialNumber == dto.SerialNumber && b.Id != bike.Id);
+
+                if (isDuplicate)
+                    return Fail(BusinessCode.DUPLICATE_DATA, "Serial number đã tồn tại");
+            }
+
             var oldPrice = bike.Price;
 
+            // detect material change
+            bool isMaterialChanged =
+                bike.SerialNumber != dto.SerialNumber ||
+                bike.Groupset != dto.Groupset ||
+                bike.FrameMaterial != dto.FrameMaterial ||
+                bike.BrakeType != dto.BrakeType ||
+                bike.Condition != dto.Condition ||
+                bike.Category != dto.Category ||
+                bike.Brand != dto.Brand;
+
+            // update
             listing.Title = dto.Title.Trim();
             listing.Description = dto.Description.Trim();
 
@@ -366,12 +391,19 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             bike.Price = dto.Price;
             bike.City = dto.City.Trim();
 
+            // rule: published -> sửa quan trọng hoặc giá >10% => pending review
             if (listing.Status == ListingStatusEnum.Published && oldPrice > 0)
             {
-                var diffPercent = Math.Abs(dto.Price - oldPrice) / oldPrice;
-                if (diffPercent > 0.1m)
+                if (isMaterialChanged)
                 {
                     listing.Status = ListingStatusEnum.PendingReview;
+                    bike.Status = BikeStatusEnum.PendingInspection;
+                }
+                else
+                {
+                    var diffPercent = Math.Abs(dto.Price - oldPrice) / oldPrice;
+                    if (diffPercent > 0.1m)
+                        listing.Status = ListingStatusEnum.PendingReview;
                 }
             }
 
@@ -389,23 +421,21 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (listing == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy listing");
 
-            var hasActiveOrder = await HasActiveOrderAsync(listingId);
-            if (hasActiveOrder)
+            if (await HasActiveOrderAsync(listingId))
                 return Fail(BusinessCode.INVALID_ACTION, "Đang có đơn active, không thể xóa");
 
             var bike = await GetBikeByListingIdAsync(listingId);
 
+            // ✅ soft delete
+            listing.IsDeleted = true;
+
             if (bike != null)
             {
-                var medias = await _mediaRepo.GetListByExpression(m => m.BikeId == bike.Id);
+                bike.IsDeleted = true;
 
-                if (medias.Any())
-                    await _mediaRepo.DeleteRange(medias);
-
-                await _bikeRepo.Delete(bike);
+              
             }
 
-            await _listingRepo.Delete(listing);
             await _uow.SaveChangeAsync();
 
             return Success(null, BusinessCode.DELETE_SUCESSFULLY);
@@ -430,10 +460,17 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 .Take(pageSize)
                 .ToListAsync();
 
+            // sync reserved
+            foreach (var l in listings)
+            {
+                if (await HasActiveOrderAsync(l.Id))
+                    l.Status = ListingStatusEnum.Reserved;
+            }
+
             var items = listings.Select(l =>
             {
                 var bike = l.Bikes.FirstOrDefault();
-                var thumbnail = bike?.Medias?.FirstOrDefault()?.Image;
+                var thumbnail = bike?.Medias?.FirstOrDefault(m => !m.IsDeleted)?.Image;
 
                 return new ListingDTO
                 {
@@ -467,9 +504,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         public async Task<ResponseDTO> GetDetailsAsync(Guid sellerId, Guid listingId)
         {
             var listing = await _listingRepo.AsQueryable()
-                .Include(l => l.Bikes)
-                    .ThenInclude(b => b.Medias)
-                .FirstOrDefaultAsync(l => l.Id == listingId && l.UserId == sellerId);
+               .Include(l => l.Bikes)
+                   .ThenInclude(b => b.Medias)
+               .FirstOrDefaultAsync(l => l.Id == listingId && l.UserId == sellerId);
 
             if (listing == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy listing");

@@ -22,12 +22,17 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
 
         private Guid GetUserId()
         {
-            return Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrEmpty(userId))
+                throw new UnauthorizedAccessException("User chưa đăng nhập");
+
+            return Guid.Parse(userId);
         }
 
         // ================= CREATE =================
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] ListingCreateDTO dto)
+        public async Task<IActionResult> Create([FromForm] ListingCreateDTO dto)
         {
             var result = await _service.CreateAsync(GetUserId(), dto);
             return HandleResult(result);
