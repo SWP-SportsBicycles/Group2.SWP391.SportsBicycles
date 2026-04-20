@@ -5,12 +5,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
 {
     [ApiController]
     [Route("api/buyer-order")]
-    [Authorize]
+    [Authorize(Roles = "BUYER")]
     public class BuyerOrderController : ControllerBase
     {
         private readonly IBuyerOrderService _service;
@@ -20,20 +21,41 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
             _service = service;
         }
 
-        private Guid GetUserId()
+        private bool TryGetUserId(out Guid userId)
         {
-            return Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            userId = Guid.Empty;
+
+            var userIdClaim = User.Claims.FirstOrDefault(c =>
+                c.Type == JwtRegisteredClaimNames.Sub ||
+                c.Type == ClaimTypes.NameIdentifier ||
+                c.Type.EndsWith("/nameidentifier"));
+
+            if (userIdClaim == null)
+                return false;
+
+            return Guid.TryParse(userIdClaim.Value, out userId);
         }
 
-        // ================= CREATE ORDER =================
+        private IActionResult UnauthorizedUser()
+        {
+            return Unauthorized(new ResponseDTO
+            {
+                IsSucess = false,
+                BusinessCode = BusinessCode.AUTH_NOT_FOUND,
+                Message = "Không xác định được người dùng"
+            });
+        }
+
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateOrderDTO dto)
         {
-            var result = await _service.CreateOrderAsync(GetUserId(), dto);
+            if (!TryGetUserId(out var buyerId))
+                return UnauthorizedUser();
+
+            var result = await _service.CreateOrderAsync(buyerId, dto);
             return HandleResult(result);
         }
 
-        // ================= MARK PAID =================
         [HttpPost("{orderId}/paid")]
         public async Task<IActionResult> MarkPaid([FromRoute] Guid orderId)
         {
@@ -41,7 +63,28 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
             return HandleResult(result);
         }
 
-        // ================= HANDLE =================
+        [HttpGet]
+        public async Task<IActionResult> GetMyOrders(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
+        {
+            if (!TryGetUserId(out var buyerId))
+                return UnauthorizedUser();
+
+            var result = await _service.GetMyOrdersAsync(buyerId, pageNumber, pageSize);
+            return HandleResult(result);
+        }
+
+        [HttpGet("{orderId}")]
+        public async Task<IActionResult> GetOrderDetail(Guid orderId)
+        {
+            if (!TryGetUserId(out var buyerId))
+                return UnauthorizedUser();
+
+            var result = await _service.GetOrderDetailAsync(buyerId, orderId);
+            return HandleResult(result);
+        }
+
         private IActionResult HandleResult(ResponseDTO result)
         {
             if (result == null)
@@ -75,7 +118,9 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
                     BusinessCode.EXCEPTION
                     or BusinessCode.INTERNAL_ERROR => StatusCode(StatusCodes.Status500InternalServerError, result),
 
-                    _ => BadRequest(result)
+                    BusinessCode.CREATED_SUCCESSFULLY => StatusCode(StatusCodes.Status201Created, result),
+
+                    _ => Ok(result)
                 };
             }
 

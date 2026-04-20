@@ -12,7 +12,9 @@ namespace Group2.SWP391.SportsBicycles.Common.Enums
         Paid = 2,
         Confirmed = 3,
         Shipping = 4,
-        Completed = 5,
-        Cancelled = 6
+        Delivered = 5,     // 👈 thêm
+        Completed = 6,
+        Cancelled = 7,
+        Disputed = 8       // 👈 để làm report sau
     }
 }

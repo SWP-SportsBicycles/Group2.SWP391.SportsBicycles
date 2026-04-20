@@ -4,6 +4,7 @@ using Group2.SWP391.SportsBicycles.DAL.DB;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Group2.SWP391.SportsBicycles.DAL.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260420050210_AddSellerShippingProfileAndOrderShippingFields")]
+    partial class AddSellerShippingProfileAndOrderShippingFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -288,9 +291,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<decimal?>("DistanceKm")
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -314,21 +314,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
 
                     b.Property<decimal>("SubTotal")
                         .HasColumnType("decimal(18,2)");
-
-                    b.Property<int?>("ToDistrictId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ToDistrictName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ToProvinceName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ToWardCode")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ToWardName")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
@@ -817,24 +802,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PickupAddress")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("PickupDistrictId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("PickupDistrictName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PickupProvinceName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PickupWardCode")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PickupWardName")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Role")

@@ -3,11 +3,14 @@ using Group2.SWP391.SportsBicycles.Common.DTOs;
 using Group2.SWP391.SportsBicycles.Services.Contract;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
 {
     [ApiController]
     [Route("api/buyer-listing")]
+    [Authorize(Roles = "BUYER")]
+
     public class BuyerListingController : ControllerBase
     {
         private readonly IBuyerListingService _service;

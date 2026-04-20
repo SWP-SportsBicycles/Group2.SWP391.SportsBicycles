@@ -20,17 +20,26 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
         public string ReceiverPhone { get; set; } = default!;
         public string ReceiverAddress { get; set; } = default!;
 
+        // buyer shipping info để auto shipment
+        public int? ToDistrictId { get; set; }
+        public string? ToWardCode { get; set; }
+
+        public string? ToWardName { get; set; }
+        public string? ToDistrictName { get; set; }
+        public string? ToProvinceName { get; set; }
+
+        public decimal? DistanceKm { get; set; }
+
+        // tiền
+        public decimal SubTotal { get; set; }
+        public decimal ShippingFee { get; set; }
         public decimal TotalAmount { get; set; }
 
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
-
         public ICollection<Report> Reports { get; set; } = new List<Report>();
 
         public Shipment? Shipment { get; set; }
-
-        // 1-1 transaction
         public Transaction? Transaction { get; set; }
-
         public Review? Review { get; set; }
     }
 }

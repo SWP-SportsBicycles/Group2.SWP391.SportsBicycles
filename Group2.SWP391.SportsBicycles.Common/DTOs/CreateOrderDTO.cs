@@ -13,5 +13,14 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public string ReceiverName { get; set; } = default!;
         public string ReceiverPhone { get; set; } = default!;
         public string ReceiverAddress { get; set; } = default!;
+        public decimal DistanceKm { get; set; }
+    }
+
+    public class PreviewCheckoutDTO
+    {
+        public string ReceiverName { get; set; } = default!;
+        public string ReceiverPhone { get; set; } = default!;
+        public string ReceiverAddress { get; set; } = default!;
+        public decimal DistanceKm { get; set; }
     }
 }

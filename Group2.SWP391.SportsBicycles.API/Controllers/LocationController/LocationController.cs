@@ -1,58 +1,47 @@
 ﻿using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
 using Group2.SWP391.SportsBicycles.Common.DTOs;
 using Group2.SWP391.SportsBicycles.Services.Contract;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
 
-namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
+namespace Group2.SWP391.SportsBicycles.API.Controllers.LocationController
 {
     [ApiController]
-    [Route("api/buyer-shipment")]
-    [Authorize(Roles = "BUYER")]
-
-    public class BuyerShipmentController : ControllerBase
+    [Route("api/location")]
+    [AllowAnonymous]
+    public class LocationController : ControllerBase
     {
-        private readonly IShipmentService _service;
+        private readonly IGhnLocationService _service;
 
-        public BuyerShipmentController(IShipmentService service)
+        public LocationController(IGhnLocationService service)
         {
             _service = service;
         }
 
-        // ================= CREATE SHIPMENT =================
-        [HttpPost("{orderId}")]
-        public async Task<IActionResult> CreateShipment(Guid orderId, [FromBody] CreateShipmentDTO dto)
+        // ================= GET SUPPORTED PROVINCES =================
+        [HttpGet("provinces")]
+        public async Task<IActionResult> GetSupportedProvinces()
         {
-            var result = await _service.CreateShipmentAsync(orderId, dto);
+            var result = await _service.GetSupportedProvincesAsync();
             return HandleResult(result);
         }
 
-        // ================= GET SHIPMENT BY ORDER =================
-        [HttpGet("{orderId}")]
-        public async Task<IActionResult> GetShipmentByOrderId(Guid orderId)
+        // ================= GET DISTRICTS BY PROVINCE =================
+        [HttpGet("districts")]
+        public async Task<IActionResult> GetDistricts([FromQuery] int provinceId)
         {
-            var result = await _service.GetShipmentByOrderIdAsync(orderId);
+            var result = await _service.GetDistrictsAsync(provinceId);
             return HandleResult(result);
         }
 
-        // ================= SYNC TRACKING =================
-        [HttpPost("sync/{orderId}")]
-        public async Task<IActionResult> SyncTracking(Guid orderId)
+        // ================= GET WARDS BY DISTRICT =================
+        [HttpGet("wards")]
+        public async Task<IActionResult> GetWards([FromQuery] int districtId)
         {
-            var result = await _service.SyncTrackingAsync(orderId);
+            var result = await _service.GetWardsAsync(districtId);
             return HandleResult(result);
         }
-
-
-        [HttpPost("confirm-received/{orderId}")]
-        public async Task<IActionResult> ConfirmReceived(Guid orderId)
-        {
-            var buyerId = Guid.Parse(User.FindFirst("userId")!.Value);
-            var result = await _service.ConfirmReceivedAsync(buyerId, orderId);
-            return HandleResult(result);
-        }
-
 
         // ================= HANDLE RESULT =================
         private IActionResult HandleResult(ResponseDTO result)

@@ -22,7 +22,13 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
         public decimal WalletBalance { get; set; }
 
         public UserStatusEnum Status { get; set; } = UserStatusEnum.InActive;
+        public string? PickupAddress { get; set; }
+        public int? PickupDistrictId { get; set; }
+        public string? PickupWardCode { get; set; }
 
+        public string? PickupWardName { get; set; }
+        public string? PickupDistrictName { get; set; }
+        public string? PickupProvinceName { get; set; }
         public Cart? Cart { get; set; }
         public ICollection<Listing> Listings { get; set; } = new List<Listing>();
         public ICollection<Order> Orders { get; set; } = new List<Order>();
@@ -34,5 +40,7 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
         public ICollection<Report> Reports { get; set; } = new List<Report>();
 
         public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
+
+        public ICollection<SellerShippingProfile> SellerShippingProfiles { get; set; } = new List<SellerShippingProfile>();
     }
 }

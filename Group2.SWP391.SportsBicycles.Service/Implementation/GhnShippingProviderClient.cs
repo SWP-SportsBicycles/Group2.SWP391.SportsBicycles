@@ -13,11 +13,20 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         private readonly GhnSettings _settings;
 
         public GhnShippingProviderClient(
-            HttpClient httpClient,
-            IOptions<GhnSettings> settings)
+        HttpClient httpClient,
+        IOptions<GhnSettings> settings)
         {
             _httpClient = httpClient;
-            _settings = settings.Value;
+            _settings = settings.Value ?? throw new ArgumentNullException(nameof(settings));
+
+            if (string.IsNullOrWhiteSpace(_settings.BaseUrl))
+                throw new ArgumentException("GhnSettings:BaseUrl chưa được cấu hình");
+
+            if (string.IsNullOrWhiteSpace(_settings.Token))
+                throw new ArgumentException("GhnSettings:Token chưa được cấu hình");
+
+            if (string.IsNullOrWhiteSpace(_settings.ShopId))
+                throw new ArgumentException("GhnSettings:ShopId chưa được cấu hình");
 
             _httpClient.BaseAddress = new Uri(_settings.BaseUrl.TrimEnd('/') + "/");
             _httpClient.DefaultRequestHeaders.Clear();
@@ -54,6 +63,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                 if (toDistrictId <= 0)
                     return (false, null, "toDistrictId không hợp lệ");
+
+                if (string.IsNullOrWhiteSpace(fromWardCode))
+                    return (false, null, "fromWardCode không được để trống");
 
                 if (string.IsNullOrWhiteSpace(toWardCode))
                     return (false, null, "toWardCode không được để trống");
@@ -186,7 +198,24 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 var data = root.GetProperty("data");
                 var status = data.TryGetProperty("status", out var s) ? s.GetString() : "pending";
 
-                return (true, status, status, "GHN Hub", DateTime.UtcNow, null);
+                DateTime? eventTime = null;
+                if (data.TryGetProperty("updated_date", out var updated) &&
+                    updated.ValueKind == JsonValueKind.String &&
+                    DateTime.TryParse(updated.GetString(), out var parsedDate))
+                {
+                    eventTime = parsedDate;
+                }
+
+                string? location = null;
+                if (data.TryGetProperty("current_warehouse", out var warehouse) &&
+                    warehouse.ValueKind == JsonValueKind.String)
+                {
+                    location = warehouse.GetString();
+                }
+
+                var description = !string.IsNullOrWhiteSpace(status) ? $"GHN: {status}" : "GHN tracking update";
+
+                return (true, status, description, location, eventTime ?? DateTime.UtcNow, null);
             }
             catch (Exception ex)
             {
