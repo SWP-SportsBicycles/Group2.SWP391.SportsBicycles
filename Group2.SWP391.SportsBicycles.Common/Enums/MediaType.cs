@@ -8,7 +8,8 @@ namespace Group2.SWP391.SportsBicycles.Common.Enums
 {
     public enum MediaType
     {
-        Normal = 0,
-        Groupset = 1 // 👈 bắt buộc cho SRS
+        Thumbnail = 0,
+        Normal = 1,
+        Groupset = 2
     }
 }

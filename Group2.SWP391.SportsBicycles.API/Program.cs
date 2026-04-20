@@ -77,6 +77,7 @@ builder.Services.AddScoped<IAdminListingService, AdminListingService>();
 builder.Services.AddScoped<IBuyerOrderService, BuyerOrderService>();
 builder.Services.AddHttpClient<IChatService, ChatService>();
 builder.Services.AddScoped<IShipmentService, ShipmentService>();
+builder.Services.AddScoped<ISellerMediaService, SellerMediaService>();  
 builder.Services.AddHttpClient<IShippingProviderClient, GhnShippingProviderClient>();
 builder.Services.AddScoped<IPaymentService, PaymentService>(); 
 builder.Services.AddHttpClient<IPayOSService, PayOSService>();
@@ -208,7 +209,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 
-
+app.UseDeveloperExceptionPage();
 
 app.MapControllers();
 
