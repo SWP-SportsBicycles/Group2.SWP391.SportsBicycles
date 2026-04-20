@@ -4,6 +4,7 @@ using Group2.SWP391.SportsBicycles.DAL.DB;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Group2.SWP391.SportsBicycles.DAL.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260420050340_UpdateOrder")]
+    partial class UpdateOrder
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -234,9 +237,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<string>("RejectReason")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -266,20 +266,11 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
                     b.Property<Guid>("BikeId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<string>("Image")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
                     b.Property<int>("Type")
                         .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("VideoUrl")
                         .HasColumnType("nvarchar(max)");
@@ -829,24 +820,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PickupAddress")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("PickupDistrictId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("PickupDistrictName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PickupProvinceName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PickupWardCode")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PickupWardName")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Role")

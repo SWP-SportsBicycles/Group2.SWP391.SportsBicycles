@@ -4,6 +4,7 @@ using Group2.SWP391.SportsBicycles.DAL.DB;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Group2.SWP391.SportsBicycles.DAL.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260420043229_AddPriceFieldsToOrder")]
+    partial class AddPriceFieldsToOrder
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -234,9 +237,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<string>("RejectReason")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -266,20 +266,11 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
                     b.Property<Guid>("BikeId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<string>("Image")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
                     b.Property<int>("Type")
                         .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("VideoUrl")
                         .HasColumnType("nvarchar(max)");
@@ -299,9 +290,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<decimal?>("DistanceKm")
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -326,21 +314,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
 
                     b.Property<decimal>("SubTotal")
                         .HasColumnType("decimal(18,2)");
-
-                    b.Property<int?>("ToDistrictId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ToDistrictName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ToProvinceName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ToWardCode")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ToWardName")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
@@ -538,62 +511,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
                         .IsUnique();
 
                     b.ToTable("Reviews");
-                });
-
-            modelBuilder.Entity("Group2.SWP391.SportsBicycles.DAL.Models.SellerShippingProfile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("FromDistrictId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("FromDistrictName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FromProvinceName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FromWardCode")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FromWardName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsDefault")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("SenderAddress")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SenderName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SenderPhone")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("SellerShippingProfile");
                 });
 
             modelBuilder.Entity("Group2.SWP391.SportsBicycles.DAL.Models.Shipment", b =>
@@ -831,24 +748,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("PickupAddress")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("PickupDistrictId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("PickupDistrictName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PickupProvinceName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PickupWardCode")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PickupWardName")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int>("Role")
                         .HasColumnType("int");
 
@@ -1060,17 +959,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("Group2.SWP391.SportsBicycles.DAL.Models.SellerShippingProfile", b =>
-                {
-                    b.HasOne("Group2.SWP391.SportsBicycles.DAL.Models.User", "User")
-                        .WithMany("SellerShippingProfiles")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Group2.SWP391.SportsBicycles.DAL.Models.Shipment", b =>
                 {
                     b.HasOne("Group2.SWP391.SportsBicycles.DAL.Models.Order", "Order")
@@ -1197,8 +1085,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Migrations
                     b.Navigation("RefreshTokens");
 
                     b.Navigation("Reports");
-
-                    b.Navigation("SellerShippingProfiles");
 
                     b.Navigation("Transactions");
 

@@ -9,7 +9,7 @@ namespace Group2.SWP391.SportsBicycles.Common.Enums
     public enum ReportStatusEnum
     {
         Pending = 1,
-        Processing = 2,
+        Reviewing = 2,
         Resolved = 3,
         Rejected = 4
     }
