@@ -8,7 +8,7 @@ using MediaTypeEnum = Group2.SWP391.SportsBicycles.Common.Enums.MediaType;
 
 namespace Group2.SWP391.SportsBicycles.DAL.Models
 {
-    public class Media
+    public class Media : BaseEntity
     {
         public Guid Id { get; set; }
 
