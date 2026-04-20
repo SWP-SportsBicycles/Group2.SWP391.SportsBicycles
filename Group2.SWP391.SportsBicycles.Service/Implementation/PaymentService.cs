@@ -165,6 +165,18 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             var order = transaction.Order;
 
+            // ❗ CHẶN nếu đã có người thanh toán trước
+            if (order.Status == OrderStatusEnum.Paid)
+            {
+                transaction.Status = TransactionStatusEnum.Failed;
+                transaction.Description = "Thanh toán bị từ chối vì order đã được thanh toán trước đó";
+
+                await _uow.SaveChangeAsync();
+
+                return Fail(BusinessCode.INVALID_ACTION, "Order đã được thanh toán rồi");
+            }
+
+            // ✅ Cho phép thanh toán
             transaction.Status = TransactionStatusEnum.Paid;
             transaction.PaidAt = DateTime.UtcNow;
 
@@ -173,72 +185,15 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             await _uow.SaveChangeAsync();
 
-            if (order.Shipment != null)
-            {
-                return Success(new
-                {
-                    message = "Order đã có shipment",
-                    orderId = order.Id
-                });
-            }
-
-            var firstItem = order.OrderItems.FirstOrDefault();
-            if (firstItem?.Bike?.Listing?.User == null)
-                return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy thông tin seller");
-
-            var seller = firstItem.Bike.Listing.User;
-
-            if (string.IsNullOrWhiteSpace(seller.PickupAddress) ||
-                !seller.PickupDistrictId.HasValue ||
-                string.IsNullOrWhiteSpace(seller.PickupWardCode))
-            {
-                return Fail(BusinessCode.INVALID_ACTION, "Seller chưa cấu hình địa chỉ lấy hàng");
-            }
-
-            if (!order.ToDistrictId.HasValue ||
-                string.IsNullOrWhiteSpace(order.ToWardCode) ||
-                !order.DistanceKm.HasValue)
-            {
-                return Fail(BusinessCode.INVALID_ACTION, "Order chưa có đủ thông tin giao hàng để tạo shipment");
-            }
-
-            var shipmentDto = new CreateShipmentDTO
-            {
-                ShippingProvider = "GHN",
-
-                SenderName = seller.FullName,
-                SenderPhone = seller.PhoneNumber,
-                SenderAddress = seller.PickupAddress,
-
-                FromDistrictId = seller.PickupDistrictId.Value,
-                FromWardCode = seller.PickupWardCode,
-                FromWardName = seller.PickupWardName,
-                FromDistrictName = seller.PickupDistrictName,
-                FromProvinceName = seller.PickupProvinceName,
-
-                ToDistrictId = order.ToDistrictId.Value,
-                ToWardCode = order.ToWardCode,
-                ToWardName = order.ToWardName,
-                ToDistrictName = order.ToDistrictName,
-                ToProvinceName = order.ToProvinceName,
-
-                DistanceKm = order.DistanceKm.Value,
-
-                CodAmount = 0,
-                Note = "Auto shipment after payment"
-            };
-
-            var shipmentResult = await _shipmentService.CreateShipmentAsync(order.Id, shipmentDto);
-
-            if (!shipmentResult.IsSucess)
-                return shipmentResult;
-
+            // ❌ KHÔNG tạo shipment ở đây nữa
             return Success(new
             {
-                message = "Thanh toán thành công và đã tự tạo shipment",
-                orderId = order.Id,
-                shipment = shipmentResult.Data
+                message = "Thanh toán thành công, chờ seller confirm",
+                orderId = order.Id
             });
+
+
+          
         }
         private static ResponseDTO Success(object? data = null)
             => new()
