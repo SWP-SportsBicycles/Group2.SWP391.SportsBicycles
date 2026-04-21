@@ -115,7 +115,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 Id = Guid.NewGuid(),
                 CartId = cart.Id,
                 BikeId = bike.Id,
-                UnitPrice = bike.Price,
+                UnitPrice = bike.SalePrice,
                 IsSelected = false
             };
 
@@ -193,7 +193,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     ci.Bike.Brand,
                     ci.Bike.Category,
                     ci.Bike.FrameSize,
-                    ci.Bike.Price,
+                    ci.Bike.SalePrice,
                     Title = ci.Bike.Listing?.Title
                 }
             }).ToList();
@@ -301,6 +301,14 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                         return Fail(BusinessCode.INVALID_ACTION, $"Bike {item.BikeId} đã có người đặt");
                 }
 
+
+                foreach (var item in selectedItems)
+                {
+                    if (item.Bike == null)
+                        return Fail(BusinessCode.DATA_NOT_FOUND, "Bike không tồn tại");
+
+                    item.UnitPrice = item.Bike.SalePrice;
+                }
                 var subTotal = selectedItems.Sum(x => x.UnitPrice);
 
                 var shippingFee = dto.DistanceKm > 0
@@ -431,6 +439,13 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     return Fail(BusinessCode.INVALID_ACTION, $"Bike {item.BikeId} đã có người đặt");
             }
 
+            foreach (var item in selectedItems)
+            {
+                if (item.Bike == null)
+                    return Fail(BusinessCode.DATA_NOT_FOUND, "Bike không tồn tại");
+
+                item.UnitPrice = item.Bike.SalePrice;
+            }
             var subTotal = selectedItems.Sum(x => x.UnitPrice);
             var shippingFee = ShippingFeeCalculator.Calculate(dto.DistanceKm);
             var totalAmount = subTotal + shippingFee;

@@ -51,6 +51,8 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public string ShippingProvider { get; set; } = default!;
         public string ShipmentCode { get; set; } = default!;
         public string? ProviderOrderCode { get; set; }
+        public string? TrackingUrl { get; set; }   // 👈 thêm field này
+
         public string Status { get; set; } = default!;
         public decimal ShippingFee { get; set; }
 

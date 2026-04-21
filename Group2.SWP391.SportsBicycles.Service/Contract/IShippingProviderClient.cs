@@ -8,7 +8,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
 {
     public interface IShippingProviderClient
     {
-        Task<(bool IsSuccess, string? ProviderOrderCode, string? ErrorMessage)> CreateOrderAsync(
+        Task<(bool IsSuccess, string? ProviderOrderCode, string? TrackingUrl, string? ErrorMessage)> CreateOrderAsync(
             string provider,
             string senderName,
             string senderPhone,
@@ -27,4 +27,5 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
             string provider,
             string providerOrderCode);
     }
+
 }

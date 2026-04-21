@@ -107,7 +107,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 bike.Price = Math.Round(bike.Price * (1 + COMMISSION), 0);
 
                 // ================= APPROVE =================
-                listing.Status = ListingStatusEnum.Published;
+                listing.Status = ListingStatusEnum.     Published;
                 bike.Status = BikeStatusEnum.Available;
 
                 await _uow.SaveChangeAsync();
