@@ -84,8 +84,14 @@ builder.Services.AddHttpClient<IPayOSService, PayOSService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddHttpClient<IGhnLocationService, GhnLocationService>();
 builder.Services.AddScoped<ICartService, CartService>();
+
+builder.Services.AddScoped<IInspectorListingService, InspectorListingService>();
+
+
+
 builder.Services.AddScoped<ISellerOrderService, SellerOrderService>();
 builder.Services.AddScoped<ISellerShippingProfileService, SellerShippingProfileService>();
+
 
 builder.Services.Configure<GhnSettings>(
     builder.Configuration.GetSection("GHN"));

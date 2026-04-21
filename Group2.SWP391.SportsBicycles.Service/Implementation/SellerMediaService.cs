@@ -116,7 +116,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             if (listing.Status == ListingStatusEnum.Published)
             {
-                listing.Status = ListingStatusEnum.PendingReview;
+                listing.Status = ListingStatusEnum.PendingInspection;
                 bike.Status = BikeStatusEnum.PendingInspection;
             }
 
@@ -142,7 +142,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             if (listing.Status == ListingStatusEnum.Published)
             {
-                listing.Status = ListingStatusEnum.PendingReview;
+                listing.Status = ListingStatusEnum.PendingInspection;
                 bike.Status = BikeStatusEnum.PendingInspection;
             }
 
@@ -270,7 +270,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             // ===== UPDATE STATUS =====
             if (listing.Status == ListingStatusEnum.Published)
             {
-                listing.Status = ListingStatusEnum.PendingReview;
+                listing.Status = ListingStatusEnum.PendingInspection;
                 bike.Status = BikeStatusEnum.PendingInspection;
             }
 
