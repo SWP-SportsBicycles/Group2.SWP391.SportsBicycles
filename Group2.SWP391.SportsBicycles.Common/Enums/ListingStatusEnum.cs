@@ -9,8 +9,7 @@ namespace Group2.SWP391.SportsBicycles.Common.Enums
     public enum ListingStatusEnum
     {
         Draft = 1,
-        PendingInspection = 2,
-        Published = 3,
+        PendingInspection = 2,   // 🔥 thêm cái này
         PendingReview = 3,
 
         Published = 4,
