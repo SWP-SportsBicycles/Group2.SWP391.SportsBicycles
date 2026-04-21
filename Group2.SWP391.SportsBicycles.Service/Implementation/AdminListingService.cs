@@ -68,7 +68,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 }
                
 
-                if (listing.Status != ListingStatusEnum.PendingReview)
+                if (listing.Status != ListingStatusEnum.PendingInspection)
                 {
                     dto.IsSucess = false;
                     dto.BusinessCode = BusinessCode.INVALID_ACTION;
@@ -186,7 +186,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     return dto;
                 }
 
-                if (listing.Status != ListingStatusEnum.PendingReview)
+                if (listing.Status != ListingStatusEnum.PendingInspection)
                 {
                     dto.IsSucess = false;
                     dto.BusinessCode = BusinessCode.INVALID_ACTION;
@@ -274,7 +274,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 var query = _listingRepo.AsQueryable()
                     .Include(l => l.Bikes)
                         .ThenInclude(b => b.Medias)
-                    .Where(l => l.Status == ListingStatusEnum.PendingReview);
+                    .Where(l => l.Status == ListingStatusEnum.PendingInspection);
 
                 // ===== SEARCH =====
                 if (!string.IsNullOrWhiteSpace(search))

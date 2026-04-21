@@ -320,7 +320,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             }
 
             // ===== SUBMIT =====
-            listing.Status = ListingStatusEnum.PendingReview;
+            listing.Status = ListingStatusEnum.PendingInspection;
 
             await _uow.SaveChangeAsync();
 
@@ -396,14 +396,14 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             {
                 if (isMaterialChanged)
                 {
-                    listing.Status = ListingStatusEnum.PendingReview;
+                    listing.Status = ListingStatusEnum.PendingInspection;
                     bike.Status = BikeStatusEnum.PendingInspection;
                 }
                 else
                 {
                     var diffPercent = Math.Abs(dto.Price - oldPrice) / oldPrice;
                     if (diffPercent > 0.1m)
-                        listing.Status = ListingStatusEnum.PendingReview;
+                        listing.Status = ListingStatusEnum.PendingInspection;
                 }
             }
 
