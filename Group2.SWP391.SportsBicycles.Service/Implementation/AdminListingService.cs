@@ -66,7 +66,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     dto.Message = "Không tìm thấy listing.";
                     return dto;
                 }
-               
 
                 if (listing.Status != ListingStatusEnum.PendingReview)
                 {
@@ -86,37 +85,34 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 {
                     return Fail(BusinessCode.INVALID_ACTION, "Bike chưa sẵn sàng duyệt");
                 }
-                var hasMedia = bike.Medias != null && bike.Medias.Any(m => !m.IsDeleted);
-                if (!hasMedia)
-                {
-                    return Fail(BusinessCode.INVALID_DATA, "Listing chưa có media");
-                }
+
+                // ===== MEDIA VALID =====
                 var medias = bike.Medias?.Where(m => !m.IsDeleted).ToList();
 
                 if (medias == null || !medias.Any())
                 {
                     return Fail(BusinessCode.INVALID_DATA, "Listing chưa có media");
                 }
-                var hasImage = bike.Medias.Any(m => m.Image != null);
+
+                var hasImage = medias.Any(m => m.Image != null);
                 if (!hasImage)
                 {
                     return Fail(BusinessCode.INVALID_DATA, "Phải có ít nhất 1 ảnh");
                 }
-                if (bike == null)
-                {
-                    dto.IsSucess = false;
-                    dto.BusinessCode = BusinessCode.DATA_NOT_FOUND;
-                    dto.Message = "Không tìm thấy bike.";
-                    return dto;
-                }
 
-                // ✅ APPROVE
+                // ================= 🔥 COMMISSION 5% =================
+                const decimal COMMISSION = 0.05m;
+
+                // chỉ apply 1 lần duy nhất ở PendingReview
+                bike.Price = Math.Round(bike.Price * (1 + COMMISSION), 0);
+
+                // ================= APPROVE =================
                 listing.Status = ListingStatusEnum.Published;
                 bike.Status = BikeStatusEnum.Available;
 
                 await _uow.SaveChangeAsync();
 
-                // 📩 EMAIL
+                // ================= EMAIL =================
                 var seller = await _userRepo.GetById(listing.UserId);
 
                 if (!string.IsNullOrEmpty(seller?.Email))
@@ -144,6 +140,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         <p style='color:#28a745'>
             Đã được duyệt thành công 🎉
         </p>
+
+        <p>Giá bán trên sàn: <strong>{bike.Price:N0} VNĐ</strong></p>
 
         <p>Chúc bạn bán hàng thuận lợi 🚴</p>
     </div>
@@ -372,6 +370,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                         bike.FrameSize,
                         bike.Price
                     },
+
+
 
                     Medias = medias?.Select(m => new
                     {

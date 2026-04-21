@@ -9,12 +9,13 @@ namespace Group2.SWP391.SportsBicycles.Common.Enums
     public enum ListingStatusEnum
     {
         Draft = 1,
-        PendingReview = 2,
-        Published = 3,
+        PendingInspection = 2,   // 🔥 thêm cái này
+        PendingReview = 3,
 
-        Reserved = 4,      // có deposit active order (locked)
+        Published = 4,
 
-        Withdrawn = 5,
-        Rejected = 6
+        Reserved = 5,
+        Withdrawn = 6,
+        Rejected = 7
     }
 }
