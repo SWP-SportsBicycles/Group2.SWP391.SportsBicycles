@@ -8,6 +8,7 @@ namespace Group2.SWP391.SportsBicycles.Common.Enums
 {
     public enum OrderStatusEnum
     {
+        Locked = 0,      // 🔥 THÊM (QUAN TRỌNG NHẤT)
         Pending = 1,
         Paid = 2,
         Confirmed = 3,

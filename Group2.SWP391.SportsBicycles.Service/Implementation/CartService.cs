@@ -23,20 +23,20 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             IGenericRepository<CartItem> cartItemRepo,
             IGenericRepository<Bike> bikeRepo,
             IGenericRepository<Order> orderRepo,
-                IGenericRepository<OrderItem> orderItemRepo, // 👈 thêm dòng này
-
+            IGenericRepository<OrderItem> orderItemRepo,
             IUnitOfWork uow)
         {
             _cartRepo = cartRepo;
             _cartItemRepo = cartItemRepo;
             _bikeRepo = bikeRepo;
             _orderRepo = orderRepo;
-            _orderItemRepo = orderItemRepo; // 👈 gán
-
+            _orderItemRepo = orderItemRepo;
             _uow = uow;
         }
 
-        private static ResponseDTO Success(object? data = null, BusinessCode code = BusinessCode.GET_DATA_SUCCESSFULLY)
+        private static ResponseDTO Success(
+            object? data = null,
+            BusinessCode code = BusinessCode.GET_DATA_SUCCESSFULLY)
             => new()
             {
                 IsSucess = true,
@@ -81,7 +81,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             var hasActiveOrder = await _orderRepo.AsQueryable()
                 .AnyAsync(o =>
-                    (o.Status == OrderStatusEnum.Pending ||
+                    (o.Status == OrderStatusEnum.Locked ||
+                     o.Status == OrderStatusEnum.Pending ||
                      o.Status == OrderStatusEnum.Paid ||
                      o.Status == OrderStatusEnum.Confirmed ||
                      o.Status == OrderStatusEnum.Shipping)
@@ -131,9 +132,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             }, BusinessCode.CREATED_SUCCESSFULLY);
         }
 
-
-
-
         public async Task<ResponseDTO> UpdateCartItemSelectionAsync(Guid userId, UpdateCartItemSelectionDTO dto)
         {
             if (userId == Guid.Empty)
@@ -160,8 +158,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 cartItem.IsSelected
             }, BusinessCode.UPDATE_SUCESSFULLY);
         }
-
-
 
         public async Task<ResponseDTO> GetMyCartAsync(Guid userId)
         {
@@ -234,6 +230,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             return Success(null, BusinessCode.DELETE_SUCESSFULLY);
         }
+
         public async Task<ResponseDTO> CreateOrderFromSelectedCartAsync(Guid buyerId, CreateOrderFromCartDTO dto)
         {
             if (buyerId == Guid.Empty)
@@ -250,6 +247,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             if (string.IsNullOrWhiteSpace(dto.ReceiverAddress))
                 return Fail(BusinessCode.INVALID_DATA, "Thiếu địa chỉ người nhận");
+
+            if (dto.ToDistrictId <= 0 || string.IsNullOrWhiteSpace(dto.ToWardCode))
+                return Fail(BusinessCode.INVALID_DATA, "Thiếu thông tin địa chỉ giao hàng");
 
             await _uow.BeginTransactionAsync();
 
@@ -290,7 +290,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                     var hasActiveOrder = await _orderRepo.AsQueryable()
                         .AnyAsync(o =>
-                            (o.Status == OrderStatusEnum.Pending ||
+                            (o.Status == OrderStatusEnum.Locked ||
+                             o.Status == OrderStatusEnum.Pending ||
                              o.Status == OrderStatusEnum.Paid ||
                              o.Status == OrderStatusEnum.Confirmed ||
                              o.Status == OrderStatusEnum.Shipping)
@@ -301,17 +302,24 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 }
 
                 var subTotal = selectedItems.Sum(x => x.UnitPrice);
-                var shippingFee = ShippingFeeCalculator.Calculate(dto.DistanceKm);
+
+                var shippingFee = dto.DistanceKm > 0
+                    ? ShippingFeeCalculator.Calculate((decimal)dto.DistanceKm)
+                    : 30000;
+
                 var totalAmount = subTotal + shippingFee;
 
                 var order = new Order
                 {
                     Id = Guid.NewGuid(),
                     UserId = buyerId,
-                    Status = OrderStatusEnum.Pending,
+                    Status = OrderStatusEnum.Locked,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(5),
                     ReceiverName = dto.ReceiverName.Trim(),
                     ReceiverPhone = dto.ReceiverPhone.Trim(),
                     ReceiverAddress = dto.ReceiverAddress.Trim(),
+                    ToDistrictId = dto.ToDistrictId,
+                    ToWardCode = dto.ToWardCode,
                     SubTotal = subTotal,
                     ShippingFee = shippingFee,
                     TotalAmount = totalAmount
@@ -335,7 +343,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     item.Bike!.Status = BikeStatusEnum.Reserved;
                 }
 
-                // checkout xong thì remove khỏi cart
                 foreach (var item in selectedItems)
                 {
                     await _cartItemRepo.Delete(item);
@@ -350,7 +357,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     SubTotal = order.SubTotal,
                     ShippingFee = order.ShippingFee,
                     TotalAmount = order.TotalAmount,
-                    Status = order.Status.ToString()
+                    Status = order.Status.ToString(),
+                    ExpiresAt = order.ExpiresAt
                 }, BusinessCode.CREATED_SUCCESSFULLY);
             }
             catch
@@ -359,7 +367,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 throw;
             }
         }
-
 
         public async Task<ResponseDTO> PreviewCheckoutAsync(Guid userId, PreviewCheckoutDTO dto)
         {
@@ -378,8 +385,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (string.IsNullOrWhiteSpace(dto.ReceiverAddress))
                 return Fail(BusinessCode.INVALID_DATA, "Thiếu địa chỉ người nhận");
 
-            if (dto.DistanceKm <= 0)
-                return Fail(BusinessCode.INVALID_DATA, "Khoảng cách phải lớn hơn 0");
+            if (dto.ToDistrictId <= 0 || string.IsNullOrWhiteSpace(dto.ToWardCode))
+                return Fail(BusinessCode.INVALID_DATA, "Thiếu thông tin địa chỉ giao hàng");
 
             var cart = await _cartRepo.AsQueryable()
                 .Include(c => c.CartItems)
@@ -390,10 +397,39 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (cart == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy giỏ hàng");
 
-            var selectedItems = cart.CartItems.Where(x => x.IsSelected).ToList();
+            var selectedItems = cart.CartItems
+                .Where(x => x.IsSelected)
+                .ToList();
 
             if (!selectedItems.Any())
                 return Fail(BusinessCode.INVALID_ACTION, "Vui lòng chọn ít nhất 1 sản phẩm");
+
+            foreach (var item in selectedItems)
+            {
+                if (item.Bike == null)
+                    return Fail(BusinessCode.DATA_NOT_FOUND, "Bike không tồn tại");
+
+                if (item.Bike.Listing == null)
+                    return Fail(BusinessCode.DATA_NOT_FOUND, "Listing không tồn tại");
+
+                if (item.Bike.Listing.Status != ListingStatusEnum.Published)
+                    return Fail(BusinessCode.INVALID_ACTION, "Có sản phẩm chưa được publish");
+
+                if (item.Bike.Status != BikeStatusEnum.Available)
+                    return Fail(BusinessCode.INVALID_ACTION, $"Bike {item.Bike.Id} không còn khả dụng");
+
+                var hasActiveOrder = await _orderRepo.AsQueryable()
+                    .AnyAsync(o =>
+                        (o.Status == OrderStatusEnum.Locked ||
+                         o.Status == OrderStatusEnum.Pending ||
+                         o.Status == OrderStatusEnum.Paid ||
+                         o.Status == OrderStatusEnum.Confirmed ||
+                         o.Status == OrderStatusEnum.Shipping)
+                        && o.OrderItems.Any(oi => oi.BikeId == item.BikeId));
+
+                if (hasActiveOrder)
+                    return Fail(BusinessCode.INVALID_ACTION, $"Bike {item.BikeId} đã có người đặt");
+            }
 
             var subTotal = selectedItems.Sum(x => x.UnitPrice);
             var shippingFee = ShippingFeeCalculator.Calculate(dto.DistanceKm);

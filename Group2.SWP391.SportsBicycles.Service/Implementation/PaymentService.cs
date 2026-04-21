@@ -53,7 +53,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (order.Status == OrderStatusEnum.Paid)
                 return Fail(BusinessCode.INVALID_ACTION, "Order đã thanh toán");
 
-            if (order.Status != OrderStatusEnum.Pending)
+            if (order.Status != OrderStatusEnum.Locked &&
+                order.Status != OrderStatusEnum.Pending)
                 return Fail(BusinessCode.INVALID_ACTION, "Order không hợp lệ để tạo thanh toán");
 
             // Đã có transaction -> xử lý theo trạng thái
@@ -180,7 +181,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             transaction.Status = TransactionStatusEnum.Paid;
             transaction.PaidAt = DateTime.UtcNow;
 
-            if (order.Status == OrderStatusEnum.Pending)
+            if (order.Status == OrderStatusEnum.Locked || order.Status == OrderStatusEnum.Pending)
                 order.Status = OrderStatusEnum.Paid;
 
             await _uow.SaveChangeAsync();
