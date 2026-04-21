@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace Group2.SWP391.SportsBicycles.API.Controllers.PaymentController
 {
@@ -99,15 +100,21 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.PaymentController
 
         [AllowAnonymous]
         [HttpPost("webhook")]
-        public async Task<IActionResult> Webhook([FromBody] dynamic payload)
+        public async Task<IActionResult> Webhook([FromBody] JsonElement payload)
         {
-            string orderCode = payload?.data?.orderCode;
+            if (!payload.TryGetProperty("data", out var data))
+                return BadRequest("Thiếu data");
+
+            if (!data.TryGetProperty("orderCode", out var orderCodeElement))
+                return BadRequest("Thiếu orderCode");
+
+            string orderCode = orderCodeElement.GetString();
 
             var result = await _paymentService.HandlePaymentSuccessAsync(orderCode);
 
             return HandleResult(result);
         }
-    
+
 
         private IActionResult HandleResult(ResponseDTO result)
         {

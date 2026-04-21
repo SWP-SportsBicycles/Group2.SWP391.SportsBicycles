@@ -1,8 +1,7 @@
-﻿using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
-using Group2.SWP391.SportsBicycles.Common.DTOs;
+﻿using Group2.SWP391.SportsBicycles.Common.DTOs;
+using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
 using Group2.SWP391.SportsBicycles.Services.Contract;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
@@ -41,7 +40,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
 
         // ================= GET MY REPORTS =================
         [HttpGet]
-        public async Task<IActionResult> GetMyReports([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetMyReports()
         {
             var buyerId = GetCurrentUserId();
             if (buyerId == Guid.Empty)
@@ -54,12 +53,12 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
                 });
             }
 
-            var result = await _service.GetMyReportsAsync(buyerId, pageNumber, pageSize);
+            var result = await _service.GetMyReportsAsync(buyerId);
             return HandleResult(result);
         }
 
         // ================= GET REPORT DETAIL =================
-        [HttpGet("{reportId}")]
+        [HttpGet("{reportId:guid}")]
         public async Task<IActionResult> GetReportDetail(Guid reportId)
         {
             var buyerId = GetCurrentUserId();
@@ -77,12 +76,33 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
             return HandleResult(result);
         }
 
+
+        // ================= GET REPORTS (ADMIN) =================
+        [HttpGet]
+        public async Task<IActionResult> GetReports(
+            [FromQuery] int page = 1,
+            [FromQuery] int size = 10,
+            [FromQuery] string? status = null,
+            [FromQuery] string? type = null)
+        {
+            var result = await _service.GetReportsForAdminAsync(page, size, status, type);
+            return HandleResult(result);
+        }
+
+        // ================= UPDATE REPORT STATUS =================
+        [HttpPut("{reportId:guid}")]
+        public async Task<IActionResult> UpdateReportStatus(Guid reportId, [FromBody] UpdateReportStatusDTO dto)
+        {
+            var result = await _service.UpdateReportStatusAsync(reportId, dto);
+            return HandleResult(result);
+        }
+
         // ================= GET CURRENT USER ID =================
         private Guid GetCurrentUserId()
         {
             var userIdClaim =
-                User.FindFirst("userId")?.Value ??
                 User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                User.FindFirst("userId")?.Value ??
                 User.FindFirst("sub")?.Value;
 
             return Guid.TryParse(userIdClaim, out var userId) ? userId : Guid.Empty;

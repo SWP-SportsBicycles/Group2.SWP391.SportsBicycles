@@ -124,7 +124,7 @@ public class BuyerListingService : IBuyerListingService
             BikeId = b.Id,
             ListingId = b.ListingId,
             Title = b.Listing?.Title ?? string.Empty,
-            Price = b.Price,
+            Price = b.SalePrice,
             Brand = b.Brand,
             Category = b.Category,
             Thumbnail = b.Medias?
@@ -188,7 +188,7 @@ public class BuyerListingService : IBuyerListingService
             BikeId = b.Id,
             Brand = b.Brand,
             Category = b.Category,
-            Price = b.Price,
+            Price = b.SalePrice,
             FrameSize = b.FrameSize,
             Overall = b.Overall
         }).ToList() ?? new List<BikeDetailDTO>();
@@ -281,7 +281,7 @@ public class BuyerListingService : IBuyerListingService
             BikeId = b.Id,
             ListingId = b.ListingId,
             Title = b.Listing?.Title ?? string.Empty,
-            Price = b.Price,
+            Price = b.SalePrice,
             Brand = b.Brand,
             Category = b.Category,
             Thumbnail = b.Medias?

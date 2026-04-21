@@ -245,6 +245,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 OrderId = shipment.OrderId,
                 ShipmentCode = shipment.ShipmentCode,
                 ProviderOrderCode = shipment.ProviderOrderCode,
+                TrackingUrl = providerResult.TrackingUrl,
                 ShippingFee = shipment.ShippingFee,
                 DistanceKm = shipment.DistanceKm,
                 Status = shipment.Status.ToString(),
@@ -277,6 +278,17 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (shipment == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy shipment");
 
+            string? trackingUrl = null;
+
+            if (!string.IsNullOrWhiteSpace(shipment.ProviderOrderCode))
+            {
+                trackingUrl = shipment.ShippingProvider.ToUpper() switch
+                {
+                    "GHN" => $"https://donhang.ghn.vn/?order_code={shipment.ProviderOrderCode}",
+                    _ => null
+                };
+            }
+
             var dto = new ShipmentDetailDTO
             {
                 ShipmentId = shipment.Id,
@@ -284,6 +296,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 ShippingProvider = shipment.ShippingProvider,
                 ShipmentCode = shipment.ShipmentCode,
                 ProviderOrderCode = shipment.ProviderOrderCode,
+                TrackingUrl = trackingUrl, // 👈 thêm dòng này
                 Status = shipment.Status.ToString(),
                 ShippingFee = shipment.ShippingFee,
 
@@ -291,9 +304,25 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 SenderPhone = shipment.SenderPhone,
                 SenderAddress = shipment.SenderAddress,
 
+                // ⚠ nếu Shipment entity chưa lưu mấy field này thì để null
+                FromProvinceId = null,
+                FromDistrictId = null,
+                FromWardCode = null,
+                FromProvinceName = null,
+                FromDistrictName = null,
+                FromWardName = null,
+
                 ReceiverName = shipment.ReceiverName,
                 ReceiverPhone = shipment.ReceiverPhone,
                 ReceiverAddress = shipment.ReceiverAddress,
+
+                // ⚠ nếu Shipment entity chưa lưu mấy field này thì để null
+                ToProvinceId = null,
+                ToDistrictId = null,
+                ToWardCode = null,
+                ToProvinceName = null,
+                ToDistrictName = null,
+                ToWardName = null,
 
                 Trackings = shipment.Trackings
                     .OrderByDescending(t => t.EventTime)
@@ -309,7 +338,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             return Success(dto);
         }
-
         public async Task<ResponseDTO> SyncTrackingAsync(Guid orderId)
         {
             if (orderId == Guid.Empty)

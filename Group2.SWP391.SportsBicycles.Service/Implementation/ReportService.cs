@@ -1,32 +1,26 @@
-﻿using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
-using Group2.SWP391.SportsBicycles.Common.DTOs;
+﻿using Group2.SWP391.SportsBicycles.Common.DTOs;
+using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
 using Group2.SWP391.SportsBicycles.Common.Enums;
 using Group2.SWP391.SportsBicycles.DAL.Contract;
 using Group2.SWP391.SportsBicycles.DAL.Models;
 using Group2.SWP391.SportsBicycles.Services.Contract;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 
 namespace Group2.SWP391.SportsBicycles.Services.Implementation
 {
     public class ReportService : IReportService
     {
-        private readonly IGenericRepository<Order> _orderRepo;
         private readonly IGenericRepository<Report> _reportRepo;
+        private readonly IGenericRepository<Order> _orderRepo;
         private readonly IUnitOfWork _uow;
 
         public ReportService(
-            IGenericRepository<Order> orderRepo,
             IGenericRepository<Report> reportRepo,
+            IGenericRepository<Order> orderRepo,
             IUnitOfWork uow)
         {
-            _orderRepo = orderRepo;
             _reportRepo = reportRepo;
+            _orderRepo = orderRepo;
             _uow = uow;
         }
 
@@ -48,9 +42,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 Message = msg
             };
 
-        public async Task<ResponseDTO> CreateReportAsync(Guid userId, Guid orderId, CreateReportDTO dto)
+        public async Task<ResponseDTO> CreateReportAsync(Guid buyerId, Guid orderId, CreateReportDTO dto)
         {
-            if (userId == Guid.Empty)
+            if (buyerId == Guid.Empty)
                 return Fail(BusinessCode.AUTH_NOT_FOUND, "Không xác định được người dùng");
 
             if (orderId == Guid.Empty)
@@ -60,126 +54,174 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 return Fail(BusinessCode.INVALID_INPUT, "Dữ liệu không hợp lệ");
 
             if (string.IsNullOrWhiteSpace(dto.Reason))
-                return Fail(BusinessCode.INVALID_DATA, "Thiếu lý do report");
+                return Fail(BusinessCode.INVALID_DATA, "Lý do report không được để trống");
 
             var order = await _orderRepo.AsQueryable()
-                .Include(o => o.Shipment)
-                .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
+                .Include(o => o.Reports)
+                .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == buyerId);
 
             if (order == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy order");
 
-            if (order.Status != OrderStatusEnum.Shipping &&
-                order.Status != OrderStatusEnum.Delivered &&
-                order.Status != OrderStatusEnum.Completed)
-            {
-                return Fail(BusinessCode.INVALID_ACTION, "Order chưa ở trạng thái có thể report");
-            }
+            // Chỉ sau khi buyer confirm nhận hàng xong mới được report
+            if (order.Status != OrderStatusEnum.Completed)
+                return Fail(BusinessCode.INVALID_ACTION, "Chỉ được report sau khi đã xác nhận nhận hàng");
 
-            var existingActiveReport = await _reportRepo.AsQueryable()
-                .FirstOrDefaultAsync(r =>
-                    r.OrderId == orderId &&
-                    r.UserId == userId &&
-                    (r.Status == ReportStatusEnum.Pending ||
-                     r.Status == ReportStatusEnum.Reviewing));
+            // Mỗi order chỉ có 1 report đang mở
+            var hasOpenReport = order.Reports.Any(r =>
+                r.Status == ReportStatusEnum.Pending ||
+                r.Status == ReportStatusEnum.Reviewing);
 
-            if (existingActiveReport != null)
-                return Fail(BusinessCode.INVALID_ACTION, "Order này đã có report đang được xử lý");
+            if (hasOpenReport)
+                return Fail(BusinessCode.INVALID_ACTION, "Order đã có report đang được xử lý");
 
             var report = new Report
             {
                 Id = Guid.NewGuid(),
-                OrderId = order.Id,
-                UserId = userId,
                 Type = dto.Type,
                 Reason = dto.Reason.Trim(),
-                Status = ReportStatusEnum.Pending
+                Status = ReportStatusEnum.Pending,
+                OrderId = order.Id,
+                UserId = buyerId
             };
 
             await _reportRepo.Insert(report);
-
-            order.Status = OrderStatusEnum.Disputed;
-
             await _uow.SaveChangeAsync();
 
             return Success(new
             {
-                ReportId = report.Id,
-                OrderId = report.OrderId,
-                UserId = report.UserId,
+                report.Id,
+                report.OrderId,
                 Type = report.Type.ToString(),
-                Reason = report.Reason,
-                ReportStatus = report.Status.ToString(),
-                OrderStatus = order.Status.ToString()
+                Status = report.Status.ToString(),
+                report.Reason
             }, BusinessCode.CREATED_SUCCESSFULLY);
         }
 
-        public async Task<ResponseDTO> GetMyReportsAsync(Guid userId, int pageNumber, int pageSize)
+        public async Task<ResponseDTO> GetMyReportsAsync(Guid buyerId)
         {
-            if (userId == Guid.Empty)
+            if (buyerId == Guid.Empty)
                 return Fail(BusinessCode.AUTH_NOT_FOUND, "Không xác định được người dùng");
 
-            if (pageNumber <= 0 || pageSize <= 0)
-                return Fail(BusinessCode.INVALID_INPUT, "Thông tin phân trang không hợp lệ");
-
-            var query = _reportRepo.AsQueryable()
-                .Where(r => r.UserId == userId)
-                .OrderByDescending(r => r.CreatedAt);
-
-            var totalItems = await query.CountAsync();
-
-            var reports = await query
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize)
+            var reports = await _reportRepo.AsQueryable()
+                .Include(r => r.Order)
+                .Where(r => r.UserId == buyerId)
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.OrderId,
+                    OrderStatus = r.Order.Status.ToString(),
+                    Type = r.Type.ToString(),
+                    Status = r.Status.ToString(),
+                    r.Reason,
+                    r.CreatedAt
+                })
                 .ToListAsync();
 
-            var items = reports.Select(r => new ReportListItemDTO
-            {
-                ReportId = r.Id,
-                OrderId = r.OrderId,
-                Type = r.Type.ToString(),
-                Reason = r.Reason,
-                Status = r.Status.ToString(),
-                CreatedAt = r.CreatedAt
-            }).ToList();
-
-            return Success(new
-            {
-                Items = items,
-                TotalItems = totalItems,
-                TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize),
-                PageNumber = pageNumber,
-                PageSize = pageSize
-            });
+            return Success(reports);
         }
 
-        public async Task<ResponseDTO> GetReportDetailAsync(Guid userId, Guid reportId)
+        public async Task<ResponseDTO> GetReportDetailAsync(Guid buyerId, Guid reportId)
         {
-            if (userId == Guid.Empty)
+            if (buyerId == Guid.Empty)
                 return Fail(BusinessCode.AUTH_NOT_FOUND, "Không xác định được người dùng");
 
             if (reportId == Guid.Empty)
                 return Fail(BusinessCode.INVALID_INPUT, "ReportId không hợp lệ");
 
             var report = await _reportRepo.AsQueryable()
-                .FirstOrDefaultAsync(r => r.Id == reportId && r.UserId == userId);
+                .Include(r => r.Order)
+                .FirstOrDefaultAsync(r => r.Id == reportId && r.UserId == buyerId);
 
             if (report == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
 
-            var dto = new ReportDetailDTO
+            return Success(new
             {
-                ReportId = report.Id,
-                OrderId = report.OrderId,
-                UserId = report.UserId,
+                report.Id,
+                report.OrderId,
+                OrderStatus = report.Order.Status.ToString(),
                 Type = report.Type.ToString(),
-                Reason = report.Reason,
                 Status = report.Status.ToString(),
-                CreatedAt = report.CreatedAt,
-                UpdatedAt = report.UpdatedAt
-            };
+                report.Reason,
+                report.CreatedAt,
+                report.UpdatedAt
+            });
+        }
 
-            return Success(dto);
+        public async Task<ResponseDTO> GetReportsForAdminAsync(int page, int size, string? status, string? type)
+        {
+            if (page <= 0 || size <= 0)
+                return Fail(BusinessCode.INVALID_INPUT, "Thông tin phân trang không hợp lệ");
+
+            var query = _reportRepo.AsQueryable()
+                .Include(r => r.Order)
+                .Include(r => r.User)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(status) &&
+                Enum.TryParse<ReportStatusEnum>(status, true, out var reportStatus))
+            {
+                query = query.Where(r => r.Status == reportStatus);
+            }
+
+            if (!string.IsNullOrWhiteSpace(type) &&
+                Enum.TryParse<ReportTypeEnum>(type, true, out var reportType))
+            {
+                query = query.Where(r => r.Type == reportType);
+            }
+
+            var totalItems = await query.CountAsync();
+
+            var items = await query
+                .OrderByDescending(r => r.CreatedAt)
+                .Skip((page - 1) * size)
+                .Take(size)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.OrderId,
+                    BuyerId = r.UserId,
+                    BuyerName = r.User.FullName,
+                    Type = r.Type.ToString(),
+                    Status = r.Status.ToString(),
+                    r.Reason,
+                    r.CreatedAt
+                })
+                .ToListAsync();
+
+            return Success(new
+            {
+                PageNumber = page,
+                PageSize = size,
+                TotalItems = totalItems,
+                Items = items
+            });
+        }
+
+        public async Task<ResponseDTO> UpdateReportStatusAsync(Guid reportId, UpdateReportStatusDTO dto)
+        {
+            if (reportId == Guid.Empty)
+                return Fail(BusinessCode.INVALID_INPUT, "ReportId không hợp lệ");
+
+            if (dto == null)
+                return Fail(BusinessCode.INVALID_INPUT, "Dữ liệu không hợp lệ");
+
+            var report = await _reportRepo.GetById(reportId);
+            if (report == null)
+                return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
+
+            report.Status = dto.Status;
+
+            await _reportRepo.Update(report);
+            await _uow.SaveChangeAsync();
+
+            return Success(new
+            {
+                report.Id,
+                Status = report.Status.ToString()
+            }, BusinessCode.UPDATE_SUCESSFULLY);
         }
     }
 }

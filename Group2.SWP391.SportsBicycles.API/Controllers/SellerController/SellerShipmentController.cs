@@ -1,65 +1,31 @@
 ﻿using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
 using Group2.SWP391.SportsBicycles.Common.DTOs;
 using Group2.SWP391.SportsBicycles.Services.Contract;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
-using System.Security.Claims;
 
-namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
+namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
 {
     [ApiController]
-    [Route("api/buyer-shipment")]
-    [Authorize(Roles = "BUYER")]
-
-    public class BuyerShipmentController : ControllerBase
+    [Route("api/seller-shipment")]
+    [Authorize(Roles = "SELLER")]
+    public class SellerShipmentController : ControllerBase
     {
         private readonly IShipmentService _service;
 
-        public BuyerShipmentController(IShipmentService service)
+        public SellerShipmentController(IShipmentService service)
         {
             _service = service;
         }
 
-        // ================= CREATE SHIPMENT =================
-       
-
-        // ================= GET SHIPMENT BY ORDER =================
-        [HttpGet("{orderId}")]
-        public async Task<IActionResult> GetShipmentByOrderId(Guid orderId)
+        [HttpPost("{orderId}")]
+        public async Task<IActionResult> CreateShipment(Guid orderId, [FromBody] CreateShipmentDTO dto)
         {
-            var result = await _service.GetShipmentByOrderIdAsync(orderId);
+            var result = await _service.CreateShipmentAsync(orderId, dto);
             return HandleResult(result);
         }
 
-        // ================= SYNC TRACKING =================
-        [HttpPost("sync/{orderId}")]
-        public async Task<IActionResult> SyncTracking(Guid orderId)
-        {
-            var result = await _service.SyncTrackingAsync(orderId);
-            return HandleResult(result);
-        }
-
-
-        [HttpPost("confirm-received/{orderId}")]
-        public async Task<IActionResult> ConfirmReceived(Guid orderId)
-        {
-            var buyerIdClaim =
-                User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? User.FindFirst("sub")?.Value
-                ?? User.FindFirst("userId")?.Value;
-
-            if (string.IsNullOrWhiteSpace(buyerIdClaim))
-                return Unauthorized("Không lấy được buyerId từ token");
-
-            var buyerId = Guid.Parse(buyerIdClaim);
-
-            var result = await _service.ConfirmReceivedAsync(buyerId, orderId);
-            return HandleResult(result);
-        }
-
-
-        // ================= HANDLE RESULT =================
         private IActionResult HandleResult(ResponseDTO result)
         {
             if (result == null)
@@ -77,22 +43,17 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
                 return result.BusinessCode switch
                 {
                     BusinessCode.DATA_NOT_FOUND => NotFound(result),
-
                     BusinessCode.VALIDATION_FAILED
                         or BusinessCode.VALIDATION_ERROR
                         or BusinessCode.INVALID_INPUT
                         or BusinessCode.INVALID_DATA
                         or BusinessCode.INVALID_ACTION => BadRequest(result),
-
                     BusinessCode.AUTH_NOT_FOUND
                         or BusinessCode.WRONG_PASSWORD => Unauthorized(result),
-
                     BusinessCode.ACCESS_DENIED
                         or BusinessCode.PERMISSION_DENIED => Forbid(),
-
                     BusinessCode.EXCEPTION
                         or BusinessCode.INTERNAL_ERROR => StatusCode(500, result),
-
                     _ => BadRequest(result)
                 };
             }

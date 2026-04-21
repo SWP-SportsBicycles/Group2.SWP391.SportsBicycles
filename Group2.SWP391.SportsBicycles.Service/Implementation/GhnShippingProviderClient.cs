@@ -13,8 +13,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         private readonly GhnSettings _settings;
 
         public GhnShippingProviderClient(
-        HttpClient httpClient,
-        IOptions<GhnSettings> settings)
+            HttpClient httpClient,
+            IOptions<GhnSettings> settings)
         {
             _httpClient = httpClient;
             _settings = settings.Value ?? throw new ArgumentNullException(nameof(settings));
@@ -38,7 +38,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             _httpClient.DefaultRequestHeaders.Add("ShopId", _settings.ShopId);
         }
 
-        public async Task<(bool IsSuccess, string? ProviderOrderCode, string? ErrorMessage)> CreateOrderAsync(
+        public async Task<(bool IsSuccess, string? ProviderOrderCode, string? TrackingUrl, string? ErrorMessage)> CreateOrderAsync(
             string provider,
             string senderName,
             string senderPhone,
@@ -56,23 +56,23 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             try
             {
                 if (!string.Equals(provider, "GHN", StringComparison.OrdinalIgnoreCase))
-                    return (false, null, "Provider không được hỗ trợ");
+                    return (false, null, null, "Provider không được hỗ trợ");
 
                 if (fromDistrictId <= 0)
-                    return (false, null, "fromDistrictId không hợp lệ");
+                    return (false, null, null, "fromDistrictId không hợp lệ");
 
                 if (toDistrictId <= 0)
-                    return (false, null, "toDistrictId không hợp lệ");
+                    return (false, null, null, "toDistrictId không hợp lệ");
 
                 if (string.IsNullOrWhiteSpace(fromWardCode))
-                    return (false, null, "fromWardCode không được để trống");
+                    return (false, null, null, "fromWardCode không được để trống");
 
                 if (string.IsNullOrWhiteSpace(toWardCode))
-                    return (false, null, "toWardCode không được để trống");
+                    return (false, null, null, "toWardCode không được để trống");
 
                 var serviceResult = await GetAvailableServiceAsync(fromDistrictId, toDistrictId);
                 if (!serviceResult.IsSuccess || serviceResult.ServiceId == null)
-                    return (false, null, serviceResult.ErrorMessage ?? "Không lấy được service GHN");
+                    return (false, null, null, serviceResult.ErrorMessage ?? "Không lấy được service GHN");
 
                 var payload = new
                 {
@@ -133,7 +133,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 Console.WriteLine("GHN CREATE RESPONSE: " + body);
 
                 if (!response.IsSuccessStatusCode)
-                    return (false, null, body);
+                    return (false, null, null, body);
 
                 using var doc = JsonDocument.Parse(body);
                 var root = doc.RootElement;
@@ -144,17 +144,23 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     var message = root.TryGetProperty("message", out var msg)
                         ? msg.GetString()
                         : body;
-                    return (false, null, message);
+                    return (false, null, null, message);
                 }
 
                 var data = root.GetProperty("data");
                 var orderCode = data.GetProperty("order_code").GetString();
 
-                return (true, orderCode, null);
+                // GHN không trả tracking url public trực tiếp ở API create
+                // tạm build link tra cứu theo mã đơn
+                var trackingUrl = !string.IsNullOrWhiteSpace(orderCode)
+                    ? $"https://donhang.ghn.vn/?order_code={orderCode}"
+                    : null;
+
+                return (true, orderCode, trackingUrl, null);
             }
             catch (Exception ex)
             {
-                return (false, null, ex.Message);
+                return (false, null, null, ex.Message);
             }
         }
 
@@ -213,7 +219,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     location = warehouse.GetString();
                 }
 
-                var description = !string.IsNullOrWhiteSpace(status) ? $"GHN: {status}" : "GHN tracking update";
+                var description = !string.IsNullOrWhiteSpace(status)
+                    ? $"GHN: {status}"
+                    : "GHN tracking update";
 
                 return (true, status, description, location, eventTime ?? DateTime.UtcNow, null);
             }
@@ -265,7 +273,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 if (data.ValueKind != JsonValueKind.Array || data.GetArrayLength() == 0)
                     return (false, null, "GHN không trả về service khả dụng");
 
-                // Ưu tiên service đầu tiên
                 var firstService = data[0];
                 var serviceId = firstService.GetProperty("service_id").GetInt32();
 
