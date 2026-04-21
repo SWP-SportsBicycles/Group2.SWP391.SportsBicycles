@@ -12,6 +12,9 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
         public Guid Id { get; set; }
 
         public OrderStatusEnum Status { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow; // nếu chưa có
+
+        public DateTime? ExpiresAt { get; set; }
 
         public Guid UserId { get; set; }
         public User User { get; set; } = default!;

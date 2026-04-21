@@ -157,10 +157,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (order.Shipment != null)
                 return Fail(BusinessCode.INVALID_ACTION, "Order đã có shipment");
 
-            if (order.Status != OrderStatusEnum.Paid &&
-                order.Status != OrderStatusEnum.Confirmed)
+            if (order.Status != OrderStatusEnum.Confirmed)
             {
-                return Fail(BusinessCode.INVALID_ACTION, "Order chưa sẵn sàng để tạo shipment");
+                return Fail(BusinessCode.INVALID_ACTION, "Seller chưa confirm đơn");
             }
 
             var shippingFee = order.ShippingFee > 0
