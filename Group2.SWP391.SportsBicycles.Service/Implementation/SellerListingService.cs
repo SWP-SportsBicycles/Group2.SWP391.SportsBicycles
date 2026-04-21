@@ -14,16 +14,19 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         private readonly IGenericRepository<Bike> _bikeRepo;
         private readonly IGenericRepository<Order> _orderRepo;
         private readonly IUnitOfWork _uow;
+        private readonly IGenericRepository<SellerShippingProfile> _shippingRepo;
 
         public SellerListingService(
             IGenericRepository<Listing> listingRepo,
             IGenericRepository<Bike> bikeRepo,
             IGenericRepository<Order> orderRepo,
+            IGenericRepository<SellerShippingProfile> shippingRepo,
             IUnitOfWork uow)
         {
             _listingRepo = listingRepo;
             _bikeRepo = bikeRepo;
             _orderRepo = orderRepo;
+            _shippingRepo = shippingRepo;
             _uow = uow;
         }
 
@@ -197,6 +200,14 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         // ================= CREATE =================
         public async Task<ResponseDTO> CreateAsync(Guid sellerId, ListingCreateDTO dto)
         {
+            // ===== 🔥 CHECK SHIPPING PROFILE =====
+            var hasProfile = await _shippingRepo.AsQueryable()
+                .AnyAsync(x => x.UserId == sellerId && !x.IsDeleted);
+
+            if (!hasProfile)
+                return Fail(BusinessCode.INVALID_ACTION, "Vui lòng cập nhật địa chỉ giao hàng trước khi đăng bài");
+
+
             if (dto == null)
                 return Fail(BusinessCode.INVALID_INPUT, "Data null");
 
@@ -251,7 +262,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 TireRim = dto.TireRim?.Trim() ?? string.Empty,
                 BrakeType = dto.BrakeType?.Trim() ?? string.Empty,
                 Overall = dto.Overall?.Trim() ?? string.Empty,
-                Price = dto.Price,
+                OriginalPrice = dto.Price,
+                SalePrice = dto.Price,
                 City = dto.City?.Trim() ?? string.Empty,
                 Status = BikeStatusEnum.PendingInspection
             };
@@ -321,6 +333,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             // ===== SUBMIT =====
             listing.Status = ListingStatusEnum.PendingInspection;
+            bike.Status = BikeStatusEnum.PendingInspection;
 
             await _uow.SaveChangeAsync();
 
@@ -331,11 +344,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         public async Task<ResponseDTO> UpdateAsync(Guid sellerId, Guid listingId, ListingUpsertDTO dto)
         {
             var listing = await _listingRepo.GetByExpression(
-                 x => x.Id == listingId && x.UserId == sellerId);
-
-            var validate = ValidateUpdateDto(dto);
-            if (!validate.IsSucess)
-                return validate;
+        x => x.Id == listingId && x.UserId == sellerId);
 
             if (listing == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy listing");
@@ -344,35 +353,32 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (bike == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy bike");
 
+            // ❌ có đơn thì cấm
             if (await HasActiveOrderAsync(listingId))
-                return Fail(BusinessCode.INVALID_ACTION, "Đang có đơn active, không thể update");
+                return Fail(BusinessCode.INVALID_ACTION, "Đang có đơn active");
 
+            // ❌ withdraw thì cấm
             if (listing.Status == ListingStatusEnum.Withdrawn)
                 return Fail(BusinessCode.INVALID_ACTION, "Listing đã withdraw");
 
-            // ✅ check serial duplicate khi đổi
-            if (!string.Equals(bike.SerialNumber, dto.SerialNumber.Trim(), StringComparison.OrdinalIgnoreCase))
-            {
-                var isDuplicate = await _bikeRepo.AsQueryable()
-                    .AnyAsync(b => b.SerialNumber == dto.SerialNumber && b.Id != bike.Id);
+            // ================= 🔥 RULE 1: 3 TIẾNG =================
+            var hours = (DateTime.UtcNow - listing.CreatedAt).TotalHours;
+            if (hours > 3)
+                return Fail(BusinessCode.INVALID_ACTION, "Chỉ được edit trong 3 giờ đầu");
 
-                if (isDuplicate)
-                    return Fail(BusinessCode.DUPLICATE_DATA, "Serial number đã tồn tại");
+            // ================= 🔥 RULE 2: LOCK SAU INSPECT =================
+            if (listing.Status == ListingStatusEnum.PendingInspection ||
+                listing.Status == ListingStatusEnum.PendingReview ||
+                listing.Status == ListingStatusEnum.Published)
+            {
+                return Fail(BusinessCode.INVALID_ACTION, "Listing đã qua kiểm duyệt, không được sửa");
             }
 
-            var oldPrice = bike.Price;
+            var validate = ValidateUpdateDto(dto);
+            if (!validate.IsSucess)
+                return validate;
 
-            // detect material change
-            bool isMaterialChanged =
-                bike.SerialNumber != dto.SerialNumber ||
-                bike.Groupset != dto.Groupset ||
-                bike.FrameMaterial != dto.FrameMaterial ||
-                bike.BrakeType != dto.BrakeType ||
-                bike.Condition != dto.Condition ||
-                bike.Category != dto.Category ||
-                bike.Brand != dto.Brand;
-
-            // update
+            // ===== UPDATE =====
             listing.Title = dto.Title.Trim();
             listing.Description = dto.Description.Trim();
 
@@ -388,24 +394,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             bike.TireRim = dto.TireRim.Trim();
             bike.BrakeType = dto.BrakeType.Trim();
             bike.Overall = dto.Overall.Trim();
-            bike.Price = dto.Price;
+            bike.OriginalPrice = dto.Price;
+            bike.SalePrice = dto.Price; // reset lại
             bike.City = dto.City.Trim();
-
-            // rule: published -> sửa quan trọng hoặc giá >10% => pending review
-            if (listing.Status == ListingStatusEnum.Published && oldPrice > 0)
-            {
-                if (isMaterialChanged)
-                {
-                    listing.Status = ListingStatusEnum.PendingInspection;
-                    bike.Status = BikeStatusEnum.PendingInspection;
-                }
-                else
-                {
-                    var diffPercent = Math.Abs(dto.Price - oldPrice) / oldPrice;
-                    if (diffPercent > 0.1m)
-                        listing.Status = ListingStatusEnum.PendingInspection;
-                }
-            }
 
             await _uow.SaveChangeAsync();
 

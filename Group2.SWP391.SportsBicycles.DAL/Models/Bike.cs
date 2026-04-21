@@ -38,6 +38,8 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
 
         // ===== PRICE =====
         public decimal Price { get; set; }
+        public decimal OriginalPrice { get; set; }   // giá seller
+        public decimal SalePrice { get; set; }       // giá bán
 
         // ===== STATUS =====
         public BikeStatusEnum Status { get; set; }
