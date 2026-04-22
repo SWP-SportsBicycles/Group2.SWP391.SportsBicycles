@@ -251,9 +251,26 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     return Fail(BusinessCode.INVALID_ACTION, "Listing không ở trạng thái chờ inspector kiểm tra");
 
                 var validationErrors = ValidateListing(listing);
-                var finalComment = validationErrors.Any()
-                    ? string.Join(" | ", validationErrors)
-                    : (string.IsNullOrWhiteSpace(dto.Comment) ? "Inspector checked and sent to admin" : dto.Comment.Trim());
+
+                // Lấy kết quả chấm từ request body
+                var frameOk = dto.Frame;
+                var paintOk = dto.PaintCondition;
+                var drivetrainOk = dto.Drivetrain;
+                var brakesOk = dto.Brakes;
+
+                int score = 0;
+                if (frameOk) score += 25;
+                if (paintOk) score += 25;
+                if (drivetrainOk) score += 25;
+                if (brakesOk) score += 25;
+
+                var isPass = dto.ForcePass ?? (score >= 50);
+
+                var baseComment = validationErrors.Any()
+                    ? string.Join(" | ", validationErrors.Distinct())
+                    : (string.IsNullOrWhiteSpace(dto.Comment)
+                        ? "Inspector checked and sent to admin"
+                        : dto.Comment.Trim());
 
                 foreach (var bike in listing.Bikes)
                 {
@@ -261,25 +278,32 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     {
                         Id = Guid.NewGuid(),
                         UserId = inspectorId,
-                        Frame = !validationErrors.Any(),
-                        PaintCondition = !validationErrors.Any(),
-                        Drivetrain = !validationErrors.Any(),
-                        Brakes = !validationErrors.Any(),
-                        Score = validationErrors.Any() ? 0 : 10,
-                        Comment = finalComment,
+                        Frame = frameOk,
+                        PaintCondition = paintOk,
+                        Drivetrain = drivetrainOk,
+                        Brakes = brakesOk,
+                        Score = score,
+                        Comment = baseComment,
                         InspectionDate = DateTime.UtcNow
                     };
 
                     await _inspectionRepo.Insert(inspection);
 
                     bike.InspectionId = inspection.Id;
-                    bike.Overall = validationErrors.Any() ? "Need Admin Review - Invalid" : "Checked";
+
+                    if (dto.IsFlagged == true)
+                    {
+                        bike.Overall = "Flagged for Admin Review";
+                    }
+                    else
+                    {
+                        bike.Overall = isPass ? "Checked" : "Need Admin Review - Invalid";
+                    }
+
                     bike.Status = BikeStatusEnum.PendingReview;
                 }
 
-                // Không đổi sang Published ở đây
-                // Không reject cuối ở đây
-                // Vẫn giữ PendingInspection để admin xử lý tiếp
+                // giữ nguyên flow status của bạn
                 listing.Status = ListingStatusEnum.PendingReview;
 
                 await _uow.SaveChangeAsync();
@@ -289,7 +313,14 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 {
                     ListingId = listing.Id,
                     Status = listing.Status.ToString(),
-                    Comment = finalComment,
+                    Score = score,
+                    Frame = frameOk,
+                    PaintCondition = paintOk,
+                    Drivetrain = drivetrainOk,
+                    Brakes = brakesOk,
+                    IsPass = isPass,
+                    IsFlagged = dto.IsFlagged ?? false,
+                    Comment = baseComment,
                     SentToAdmin = true
                 }, BusinessCode.UPDATE_SUCESSFULLY);
             }
