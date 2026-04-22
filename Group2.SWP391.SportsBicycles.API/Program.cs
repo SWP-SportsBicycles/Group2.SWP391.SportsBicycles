@@ -76,6 +76,7 @@ builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
 
 builder.Services.AddScoped<IInspectorListingService, InspectorListingService>();
 
+builder.Services.AddScoped<IWishlistService, WishlistService>();
 
 
 builder.Services.AddScoped<ISellerOrderService, SellerOrderService>();

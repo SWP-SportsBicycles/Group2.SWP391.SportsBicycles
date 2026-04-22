@@ -78,7 +78,14 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 BikeId = bikeId
             });
 
-            return Success(null, BusinessCode.CREATED_SUCCESSFULLY);
+            await _wishlistRepo.GetDbContext().SaveChangesAsync();
+
+            return new ResponseDTO
+            {
+                IsSucess = true,
+                BusinessCode = BusinessCode.CREATED_SUCCESSFULLY,
+                Message = "Đã thêm vào danh sách yêu thích"
+            };
         }
 
         // ================= REMOVE =================
@@ -95,8 +102,14 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Bike không có trong wishlist");
 
             await _wishlistRepo.Delete(item);
+            await _wishlistRepo.GetDbContext().SaveChangesAsync();
 
-            return Success(null, BusinessCode.DELETE_SUCESSFULLY);
+            return new ResponseDTO
+            {
+                IsSucess = true,
+                BusinessCode = BusinessCode.DELETE_SUCESSFULLY,
+                Message = "Đã xoá khỏi danh sách yêu thích"
+            };
         }
 
         // ================= GET MY WISHLIST =================
@@ -147,14 +160,22 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 IsWishlisted = true
             }).ToList();
 
-            return Success(new
+            return new ResponseDTO
             {
-                Items = items,
-                TotalItems = totalItems,
-                TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize),
-                PageNumber = pageNumber,
-                PageSize = pageSize
-            });
+                IsSucess = true,
+                BusinessCode = BusinessCode.GET_DATA_SUCCESSFULLY,
+                Message = totalItems == 0
+          ? "Danh sách yêu thích trống"
+          : "Lấy danh sách yêu thích thành công",
+                Data = new
+                {
+                    Items = items,
+                    TotalItems = totalItems,
+                    TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize),
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                }
+            };
         }
     }
 }
