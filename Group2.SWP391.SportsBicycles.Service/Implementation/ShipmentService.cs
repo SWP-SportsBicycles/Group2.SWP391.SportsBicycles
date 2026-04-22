@@ -445,6 +445,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 return Fail(BusinessCode.INVALID_ACTION, "Shipment chưa giao thành công");
 
             order.Status = OrderStatusEnum.Completed;
+            order.CompletedAt = DateTime.UtcNow;
 
             foreach (var item in order.OrderItems)
             {

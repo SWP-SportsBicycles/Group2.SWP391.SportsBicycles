@@ -386,6 +386,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             // ===== UPDATE =====
             listing.Title = dto.Title.Trim();
             listing.Description = dto.Description.Trim();
+            listing.UpdatedAt = DateTime.UtcNow;
 
             bike.SerialNumber = dto.SerialNumber.Trim();
             bike.Category = dto.Category.Trim();
@@ -579,6 +580,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             {
                 var listing = await _listingRepo.AsQueryable()
                     .Include(l => l.Bikes)
+                        .ThenInclude(b => b.Medias)
                     .FirstOrDefaultAsync(l => l.Id == listingId && l.UserId == userId);
 
                 if (listing == null)
@@ -597,14 +599,50 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     return dto;
                 }
 
+                // 🔥 BẮT BUỘC PHẢI SỬA TRƯỚC KHI RESUBMIT
+                if (listing.UpdatedAt == null || listing.UpdatedAt == listing.CreatedAt)
+                {
+                    dto.IsSucess = false;
+                    dto.BusinessCode = BusinessCode.INVALID_ACTION;
+                    dto.Message = "Bạn phải chỉnh sửa listing trước khi resubmit.";
+                    return dto;
+                }
+
+                var bike = listing.Bikes.FirstOrDefault();
+                if (bike == null)
+                {
+                    dto.IsSucess = false;
+                    dto.BusinessCode = BusinessCode.DATA_NOT_FOUND;
+                    dto.Message = "Không tìm thấy bike.";
+                    return dto;
+                }
+
+                // 🔥 VALIDATE MEDIA LẠI
+                var medias = bike.Medias?
+                    .Where(m => !m.IsDeleted)
+                    .ToList();
+
+                if (medias == null || !medias.Any())
+                {
+                    dto.IsSucess = false;
+                    dto.BusinessCode = BusinessCode.INVALID_DATA;
+                    dto.Message = "Phải có ít nhất 1 media.";
+                    return dto;
+                }
+
+                if (!medias.Any(m => m.Image != null))
+                {
+                    dto.IsSucess = false;
+                    dto.BusinessCode = BusinessCode.INVALID_DATA;
+                    dto.Message = "Phải có ít nhất 1 ảnh.";
+                    return dto;
+                }
+
                 // 🔥 RESET STATUS
                 listing.Status = ListingStatusEnum.PendingInspection;
                 listing.RejectReason = null;
 
-                foreach (var bike in listing.Bikes)
-                {
-                    bike.Status = BikeStatusEnum.PendingInspection;
-                }
+                bike.Status = BikeStatusEnum.PendingInspection;
 
                 await _uow.SaveChangeAsync();
 
@@ -622,4 +660,4 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             return dto;
         }
     }
-}
+}   
