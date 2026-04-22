@@ -138,6 +138,28 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (listing == null || listing.UserId != sellerId)
                 return Fail("Không có quyền");
 
+            // 🔥 FIX: không cho video làm thumbnail
+            if (type == MediaType.Thumbnail && !string.IsNullOrEmpty(media.VideoUrl))
+            {
+                return Fail("Video không thể làm thumbnail");
+            }
+
+            // 🔥 FIX: đảm bảo chỉ 1 thumbnail
+            if (type == MediaType.Thumbnail)
+            {
+                var medias = await _mediaRepo.AsQueryable()
+                    .Where(x => x.BikeId == bike.Id && !x.IsDeleted)
+                    .ToListAsync();
+
+                foreach (var m in medias)
+                {
+                    if (m.Id != mediaId && m.Type == MediaType.Thumbnail)
+                    {
+                        m.Type = MediaType.Normal;
+                    }
+                }
+            }
+
             media.Type = type;
 
             if (listing.Status == ListingStatusEnum.Published)
@@ -176,6 +198,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 .Include(x => x.Bikes)
                 .FirstOrDefaultAsync(x => x.Id == listingId && x.UserId == sellerId);
 
+            if (listing.Status != ListingStatusEnum.Draft)
+                return Fail("Chỉ được upload media khi listing ở trạng thái draft");
+
             if (listing == null)
                 return Fail("Listing không tồn tại");
 
@@ -191,10 +216,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             int currentImages = existingMedia.Count(x => x.Image != null);
             int currentVideos = existingMedia.Count(x => x.VideoUrl != null);
 
-            var urls = new List<string>();
-            bool hasThumbnail = existingMedia.Any(x => x.Type == MediaType.Normal);
+            // 🔥 FIX: check đúng thumbnail
+            bool hasThumbnail = existingMedia.Any(x => x.Type == MediaType.Thumbnail);
 
-            // ===== LOOP =====
+            var urls = new List<string>();
+
             foreach (var file in files)
             {
                 if (file == null || file.Length == 0)
@@ -202,17 +228,16 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                 var ext = Path.GetExtension(file.FileName).ToLower();
 
-                // ===== IMAGE =====
                 if (file.ContentType.StartsWith("image"))
                 {
                     if (!allowedImageExt.Contains(ext))
-                        return Fail("Ảnh không đúng định dạng");
+                        return Fail("Ảnh không hợp lệ");
 
                     if (file.Length > MAX_IMAGE_SIZE)
-                        return Fail("Ảnh vượt quá 5MB");
+                        return Fail("Ảnh quá lớn");
 
                     if (currentImages >= MAX_IMAGES)
-                        return Fail($"Chỉ tối đa {MAX_IMAGES} ảnh");
+                        return Fail("Quá số lượng ảnh");
 
                     var url = await _cloud.UploadImageAsync(file, $"listing/{listingId}");
                     currentImages++;
@@ -224,8 +249,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                         Image = url,
                         VideoUrl = null,
 
-                        // 👉 AUTO THUMBNAIL: ảnh đầu tiên
-                        Type = hasThumbnail ? MediaType.Groupset : MediaType.Normal
+                        // 🔥 FIX: thumbnail chuẩn
+                        Type = !hasThumbnail ? MediaType.Thumbnail : MediaType.Normal
                     };
 
                     hasThumbnail = true;
@@ -233,18 +258,16 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     await _mediaRepo.Insert(media);
                     urls.Add(url);
                 }
-
-                // ===== VIDEO =====
                 else if (file.ContentType.StartsWith("video"))
                 {
                     if (!allowedVideoExt.Contains(ext))
-                        return Fail("Video không đúng định dạng");
+                        return Fail("Video không hợp lệ");
 
                     if (file.Length > MAX_VIDEO_SIZE)
-                        return Fail("Video vượt quá 50MB");
+                        return Fail("Video quá lớn");
 
                     if (currentVideos >= MAX_VIDEOS)
-                        return Fail("Chỉ được 1 video");
+                        return Fail("Chỉ 1 video");
 
                     var url = await _cloud.UploadVideoAsync(file, $"listing/{listingId}");
                     currentVideos++;
@@ -265,13 +288,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 {
                     return Fail("File không hợp lệ");
                 }
-            }
-
-            // ===== UPDATE STATUS =====
-            if (listing.Status == ListingStatusEnum.Published)
-            {
-                listing.Status = ListingStatusEnum.PendingInspection;
-                bike.Status = BikeStatusEnum.PendingInspection;
             }
 
             await _uow.SaveChangeAsync();

@@ -214,6 +214,10 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (string.IsNullOrWhiteSpace(dto.SerialNumber))
                 return Fail(BusinessCode.INVALID_DATA, "Thiếu serial number");
 
+            var validate = ValidateCreateOrUpdateDto(dto);
+            if (!validate.IsSucess)
+                return validate;
+
             var serialNumber = dto.SerialNumber.Trim();
 
             // ❌ duplicate global
@@ -264,6 +268,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 Overall = dto.Overall?.Trim() ?? string.Empty,
                 OriginalPrice = dto.Price,
                 SalePrice = dto.Price,
+                Price = dto.Price,
                 City = dto.City?.Trim() ?? string.Empty,
                 Status = BikeStatusEnum.PendingInspection
             };
@@ -564,6 +569,57 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             await _uow.SaveChangeAsync();
 
             return Success(null, BusinessCode.UPDATE_SUCESSFULLY);
+        }
+
+        public async Task<ResponseDTO> ResubmitAsync(Guid listingId, Guid userId)
+        {
+            ResponseDTO dto = new ResponseDTO();
+
+            try
+            {
+                var listing = await _listingRepo.AsQueryable()
+                    .Include(l => l.Bikes)
+                    .FirstOrDefaultAsync(l => l.Id == listingId && l.UserId == userId);
+
+                if (listing == null)
+                {
+                    dto.IsSucess = false;
+                    dto.BusinessCode = BusinessCode.DATA_NOT_FOUND;
+                    dto.Message = "Không tìm thấy listing.";
+                    return dto;
+                }
+
+                if (listing.Status != ListingStatusEnum.Rejected)
+                {
+                    dto.IsSucess = false;
+                    dto.BusinessCode = BusinessCode.INVALID_ACTION;
+                    dto.Message = "Chỉ listing bị từ chối mới được resubmit.";
+                    return dto;
+                }
+
+                // 🔥 RESET STATUS
+                listing.Status = ListingStatusEnum.PendingInspection;
+                listing.RejectReason = null;
+
+                foreach (var bike in listing.Bikes)
+                {
+                    bike.Status = BikeStatusEnum.PendingInspection;
+                }
+
+                await _uow.SaveChangeAsync();
+
+                dto.IsSucess = true;
+                dto.BusinessCode = BusinessCode.UPDATE_SUCESSFULLY;
+                dto.Message = "Resubmit thành công.";
+            }
+            catch (Exception ex)
+            {
+                dto.IsSucess = false;
+                dto.BusinessCode = BusinessCode.EXCEPTION;
+                dto.Message = "Lỗi resubmit: " + ex.Message;
+            }
+
+            return dto;
         }
     }
 }

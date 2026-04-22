@@ -41,6 +41,16 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             {
                 return Fail(BusinessCode.INVALID_DATA, "Thiếu thông tin người gửi");
             }
+            if (dto.FromDistrictId <= 0 || string.IsNullOrWhiteSpace(dto.FromWardCode))
+                return Fail(BusinessCode.INVALID_DATA, "Thiếu thông tin địa chỉ");
+
+            // 🔥 VALIDATE BANK INFO
+            if (string.IsNullOrWhiteSpace(dto.BankName) ||
+                string.IsNullOrWhiteSpace(dto.BankAccountNumber) ||
+                string.IsNullOrWhiteSpace(dto.BankAccountName))
+            {
+                return Fail(BusinessCode.INVALID_DATA, "Thiếu thông tin tài khoản ngân hàng");
+            }
 
             var profile = await _repo.AsQueryable()
                 .FirstOrDefaultAsync(x => x.UserId == userId && !x.IsDeleted);
@@ -56,6 +66,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     SenderAddress = dto.SenderAddress.Trim(),
                     FromDistrictId = dto.FromDistrictId,
                     FromWardCode = dto.FromWardCode,
+                    BankName = dto.BankName.Trim(),
+                    BankAccountNumber = dto.BankAccountNumber.Trim(),
+                    BankAccountName = dto.BankAccountName.Trim(),
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -68,6 +81,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 profile.SenderAddress = dto.SenderAddress.Trim();
                 profile.FromDistrictId = dto.FromDistrictId;
                 profile.FromWardCode = dto.FromWardCode;
+                profile.BankName = dto.BankName.Trim();
+                profile.BankAccountNumber = dto.BankAccountNumber.Trim();
+                profile.BankAccountName = dto.BankAccountName.Trim();
                 profile.UpdatedAt = DateTime.UtcNow;
             }
 

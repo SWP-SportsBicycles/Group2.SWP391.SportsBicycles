@@ -10,7 +10,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
 {
     [Route("api/seller-media")]
     [ApiController]
-    [Authorize]
+    [Authorize(Roles = nameof(RoleEnum.SELLER))]
     public class SellerMediaController : ControllerBase
     {
         private readonly ISellerMediaService _service;

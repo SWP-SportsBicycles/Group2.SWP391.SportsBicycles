@@ -13,5 +13,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
         Task<ResponseDTO> GetDetailAsync(Guid listingId);
         Task<ResponseDTO> ApproveListingAsync(Guid listingId);
         Task<ResponseDTO> RejectListingAsync(Guid listingId, RejectListingDTO rejectDto);
+        Task<ResponseDTO> GetAllListingsAsync(int page, int size, string? status);
     }
 }

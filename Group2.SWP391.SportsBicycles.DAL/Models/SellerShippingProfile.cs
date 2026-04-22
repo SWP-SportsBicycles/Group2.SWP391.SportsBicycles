@@ -23,7 +23,9 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
         public string? FromWardName { get; set; }
         public string? FromDistrictName { get; set; }
         public string? FromProvinceName { get; set; }
-
+        public string BankName { get; set; } = default!;
+        public string BankAccountNumber { get; set; } = default!;
+        public string BankAccountName { get; set; } = default!;
         public bool IsDefault { get; set; } = true;
     }
 

@@ -1,16 +1,18 @@
-﻿using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
-using Group2.SWP391.SportsBicycles.Common.DTOs;
+﻿using Group2.SWP391.SportsBicycles.Common.DTOs;
+using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
+using Group2.SWP391.SportsBicycles.Common.Enums;
 using Group2.SWP391.SportsBicycles.Services.Contract;
+using Group2.SWP391.SportsBicycles.Services.Implementation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
 
 namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
 {
     [ApiController]
     [Route("api/seller-listing")]
-    [Authorize]
+    [Authorize(Roles = nameof(RoleEnum.SELLER))]
     public class SellerListingController : ControllerBase
     {
         private readonly ISellerListingService _service;
@@ -86,6 +88,15 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
         {
             var result = await _service.WithdrawAsync(GetUserId(), listingId);
             return HandleResult(result);
+        }
+        [HttpPost("{id}/resubmit")]
+        public async Task<IActionResult> Resubmit(Guid id)
+        {
+            var userId = GetUserId(); // giữ logic auth của mày
+
+            var result = await _service.ResubmitAsync(id, userId);
+
+            return Ok(result);
         }
 
         // ================= HANDLE =================

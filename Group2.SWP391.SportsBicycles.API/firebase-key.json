@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "sportsbicyclesstore",
+  "private_key_id": "cfccad6082f606b9563f759b360160f6a6a919d5",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC+gMdoiAY2fDam\ny05/huqdYeYi1TAfdsoO9mSIP96JDAP0KPzDFRc/ynKJ6P7EAbDRYfL5OJwSc5gP\nTv0iPNfn9Z+NAAFnAsPFu2Og++xBKQRPBen2BeEGb48lGftmqOZXYIEGGKMhr+IX\nGXQkrt2WFmDjlfBi3awe4IKGE62/AOqquk5idQ692/ycc9ZNG0NdSELZM9n21+ti\nwHP0AbUxgl0pwj/W4QcQagvOh3akN+b44kKpmLwVUTKNRgvulM6v9iRWX5rUAp81\nyYJDsJqXpfBcHlTjGo2TLsqOePXYvDFVCQJRZCxIB77drAtk4P7kjPqr8st4FgH3\nBAY2E/8VAgMBAAECggEALZPygZ4vvFfuHGxeaND+724ViUZvx8tcLwXAyj9brvbO\nuFsZFFSGtjapvjieQYd1Bjd00i862ghJfHolwowDjQX9aRbz/vEQpU1+2eyEGxfk\n5cIwtnG0I53LxfDoLujgiU23uN1qpDvoMCYhHUiwD8FlZ3X/aCwIiu+kks8A/gYf\n09ZlxHFePHIoi8e+24eQ0Du2tfmse9zxZ2QF0Wuy1hPnewqS8ICOsNPykqWRqFjV\nWov461bCuLK/Vh5Zyryy6hI+WUpQQWVp8EjPgvK+EkUBj49fJzGtDvxnc2XPU6Fy\nyGkSlJGA4+RgVlQ957F70R6DngLy2d5wkiYmkLCHiQKBgQD7FDgHnUkRQMvD9Gcw\nw6haxwv/I4lsMc86TbMfn4eZvPIntIMbXBTO/J0Kjp5Ds7WTNVQMjQequrvo090U\nrc7O5y3Tg9w89Atvn0swYYb+ACopR97qwlmmkxc8g19wLS7HuLg8f8XajFm7KsUA\n6TovpqcrWg2qp4ZZ7GaJsMBeKQKBgQDCPJ9FZ8rpiUDG/pGHM4nd19DLV2N5JQ6d\nLr5ULg02JjHjU7POT0lxQGY1fWEFOdEIA3xkJ/4TotzEH9MuZTPmhbjA5aMohg4k\n4NqT5YemTD1/b6E+y6pIEp6UFVtZHYNS8XMpQ1Q+y7ZeubraTcAqNXrbepam0NNn\nyTLCPi5fDQKBgB1DD/yjMh7WpGjkFRqz0u0xgY5sv9liPLqYz6WB3DXotXg3K4iG\nxM4S1uKiGIPfb+wGLROBZEFbngbWmk+Mqium+cpK9eIMt0B9GjA7TZZQwpkpDSvj\nFru5LN4amYbjXS5dsusqIQ8FiHet1mPyyps/GwCMcEdRWvEkAhdOCD1xAoGAS/ku\nSxV39rSq06sK/RkZmd4qWv7Jd78Y4j5AT+jbXgy+gq5grBezIEsSL2XlJwggTMQg\nSYSjCscvFr9j+Me47zfqtficQuN8cMxKcoLa9h7oBwqAxXEgH6S4xi88VbUHgs/S\nPZeKQi2oHZEEFxNGULwuW96tQn530iaOZg+wT5kCgYEAqNCnprG1gepfeGejmzBl\nr7R9Pntg4i2wRWSorTOjSZwS6lXS5OnqKscYn2dbnHRY1+PJ0afE8GsA7X5zn+8z\nZCoP0kj8jVjX9SBnoNmRSsgBIuyBgXIqSvfYpeeNb5JTWvxg8aS6/Tb1FW6kukeQ\nRx+fMM7H+EuFmhwdMwXgLmc=\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@sportsbicyclesstore.iam.gserviceaccount.com",
+  "client_id": "101981880312114570095",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40sportsbicyclesstore.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
