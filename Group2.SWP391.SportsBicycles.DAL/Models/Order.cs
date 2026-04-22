@@ -44,5 +44,9 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
         public Shipment? Shipment { get; set; }
         public Transaction? Transaction { get; set; }
         public Review? Review { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public DateTime? SellerNotifiedAt { get; set; }
+        public DateTime? PayoutEligibleAt { get; set; }
+        public DateTime? PaidOutAt { get; set; }
     }
 }
