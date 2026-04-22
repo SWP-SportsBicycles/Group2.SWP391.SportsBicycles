@@ -67,11 +67,12 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     return dto;
                 }
 
-                if (listing.Status != ListingStatusEnum.PendingInspection)
+                // 🔥 FIX: admin chỉ duyệt khi PendingReview
+                if (listing.Status != ListingStatusEnum.PendingReview)
                 {
                     dto.IsSucess = false;
                     dto.BusinessCode = BusinessCode.INVALID_ACTION;
-                    dto.Message = "Listing không ở trạng thái chờ duyệt.";
+                    dto.Message = "Listing chưa tới bước admin duyệt.";
                     return dto;
                 }
 
@@ -81,12 +82,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy bike.");
                 }
 
-                if (bike.Status != BikeStatusEnum.PendingInspection)
+                if (bike.Status != BikeStatusEnum.PendingReview)
                 {
-                    return Fail(BusinessCode.INVALID_ACTION, "Bike chưa sẵn sàng duyệt");
+                    return Fail(BusinessCode.INVALID_ACTION, "Bike chưa được inspector duyệt");
                 }
 
-                // ===== MEDIA VALID =====
                 var medias = bike.Medias?.Where(m => !m.IsDeleted).ToList();
 
                 if (medias == null || !medias.Any())
@@ -94,25 +94,26 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     return Fail(BusinessCode.INVALID_DATA, "Listing chưa có media");
                 }
 
-                var hasImage = medias.Any(m => m.Image != null);
-                if (!hasImage)
+                if (!medias.Any(m => m.Image != null))
                 {
                     return Fail(BusinessCode.INVALID_DATA, "Phải có ít nhất 1 ảnh");
                 }
 
-                // ================= 🔥 COMMISSION 5% =================
+                // ================= 🔥 COMMISSION SAFE =================
                 const decimal COMMISSION = 0.05m;
 
-                // chỉ apply 1 lần duy nhất ở PendingReview
-                bike.Price = Math.Round(bike.Price * (1 + COMMISSION), 0);
+                // chỉ apply 1 lần duy nhất
+                if (bike.SalePrice == bike.OriginalPrice)
+                {
+                    bike.SalePrice = Math.Round(bike.OriginalPrice * (1 + COMMISSION), 0);
+                }
 
                 // ================= APPROVE =================
-                listing.Status = ListingStatusEnum.     Published;
+                listing.Status = ListingStatusEnum.Published;
                 bike.Status = BikeStatusEnum.Available;
 
                 await _uow.SaveChangeAsync();
 
-                // ================= EMAIL =================
                 var seller = await _userRepo.GetById(listing.UserId);
 
                 if (!string.IsNullOrEmpty(seller?.Email))
@@ -184,7 +185,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     return dto;
                 }
 
-                if (listing.Status != ListingStatusEnum.PendingInspection)
+                if (listing.Status != ListingStatusEnum.PendingReview)
                 {
                     dto.IsSucess = false;
                     dto.BusinessCode = BusinessCode.INVALID_ACTION;
@@ -272,7 +273,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 var query = _listingRepo.AsQueryable()
                     .Include(l => l.Bikes)
                         .ThenInclude(b => b.Medias)
-                    .Where(l => l.Status == ListingStatusEnum.PendingInspection);
+                    .Where(l => l.Status == ListingStatusEnum.PendingReview);
 
                 // ===== SEARCH =====
                 if (!string.IsNullOrWhiteSpace(search))
@@ -347,6 +348,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 var listing = await _listingRepo.AsQueryable()
                     .Include(l => l.Bikes)
                         .ThenInclude(b => b.Medias)
+                        .Include(l => l.Bikes)
+                        .ThenInclude(b => b.Inspection)
                     .FirstOrDefaultAsync(l => l.Id == listingId);
 
                 if (listing == null)
@@ -368,7 +371,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                         bike.Brand,
                         bike.Category,
                         bike.FrameSize,
-                        bike.Price
+                        bike.Price,
+                        InspectionComment = bike.Inspection?.Comment,
+                        InspectionScore = bike.Inspection?.Score
                     },
 
 
@@ -383,6 +388,64 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 };
 
                 return Success(data);
+            }
+            catch (Exception ex)
+            {
+                return Fail(BusinessCode.EXCEPTION, ex.Message);
+            }
+        }
+
+        public async Task<ResponseDTO> GetAllListingsAsync(int page, int size, string? status)
+        {
+            try
+            {
+                 IQueryable<Listing> query = _listingRepo.AsQueryable()
+                .Include(l => l.Bikes)
+                .ThenInclude(b => b.Medias);
+
+                // 🔥 filter theo status (optional)
+                if (!string.IsNullOrEmpty(status))
+                {
+                    if (Enum.TryParse<ListingStatusEnum>(status, true, out var parsed))
+                    {
+                        query = query.Where(l => l.Status == parsed);
+                    }
+                }
+
+                var totalItems = await query.CountAsync();
+
+                var listings = await query
+                    .OrderByDescending(l => l.CreatedAt)
+                    .Skip((page - 1) * size)
+                    .Take(size)
+                    .ToListAsync();
+
+                var items = listings.Select(l =>
+                {
+                    var bike = l.Bikes.FirstOrDefault();
+                    var medias = bike?.Medias?.Where(m => !m.IsDeleted).ToList();
+
+                    return new AdminListingDTO
+                    {
+                        Id = l.Id,
+                        Title = l.Title,
+                        City = l.City,
+                        Price = bike?.Price ?? 0,
+                        Brand = bike?.Brand ?? "",
+                        Status = l.Status.ToString(),
+                        Thumbnail = medias?.FirstOrDefault(m => m.Image != null)?.Image,
+                        TotalImages = medias?.Count(m => m.Image != null) ?? 0,
+                        HasVideo = medias?.Any(m => m.VideoUrl != null) ?? false
+                    };
+                }).ToList();
+
+                return Success(new
+                {
+                    PageNumber = page,
+                    PageSize = size,
+                    TotalItems = totalItems,
+                    Items = items
+                });
             }
             catch (Exception ex)
             {

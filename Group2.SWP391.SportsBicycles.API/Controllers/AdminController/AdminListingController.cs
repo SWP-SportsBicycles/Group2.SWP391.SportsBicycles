@@ -2,6 +2,7 @@
 using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
 using Group2.SWP391.SportsBicycles.Common.Enums;
 using Group2.SWP391.SportsBicycles.Services.Contract;
+using Group2.SWP391.SportsBicycles.Services.Implementation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -52,6 +53,13 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.AdminController
         {
             var result = await _service.GetDetailAsync(listingId);
             return HandleResult(result);
+        }
+
+        [HttpGet("all")]
+        public async Task<IActionResult> GetAll(int page = 1, int size = 10, string? status = null)
+        {
+            var result = await _service.GetAllListingsAsync(page, size, status);
+            return Ok(result);
         }
 
         // ================= HANDLE =================

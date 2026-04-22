@@ -39,7 +39,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
         }
 
         // ================= GET MY REPORTS =================
-        [HttpGet]
+        [HttpGet("my")]
         public async Task<IActionResult> GetMyReports()
         {
             var buyerId = GetCurrentUserId();
@@ -56,6 +56,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
             var result = await _service.GetMyReportsAsync(buyerId);
             return HandleResult(result);
         }
+
 
         // ================= GET REPORT DETAIL =================
         [HttpGet("{reportId:guid}")]

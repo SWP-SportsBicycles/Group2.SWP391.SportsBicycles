@@ -274,11 +274,13 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                     bike.InspectionId = inspection.Id;
                     bike.Overall = validationErrors.Any() ? "Need Admin Review - Invalid" : "Checked";
+                    bike.Status = BikeStatusEnum.PendingReview;
                 }
 
                 // Không đổi sang Published ở đây
                 // Không reject cuối ở đây
                 // Vẫn giữ PendingInspection để admin xử lý tiếp
+                listing.Status = ListingStatusEnum.PendingReview;
 
                 await _uow.SaveChangeAsync();
                 await _uow.CommitAsync();

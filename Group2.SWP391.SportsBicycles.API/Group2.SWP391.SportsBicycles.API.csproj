@@ -20,5 +20,9 @@
     <ProjectReference Include="..\Group2.SWP391.SportsBicycles.DAL\Group2.SWP391.SportsBicycles.DAL.csproj" />
     <ProjectReference Include="..\Group2.SWP391.SportsBicycles.Service\Group2.SWP391.SportsBicycles.Services.csproj" />
   </ItemGroup>
-
+	<ItemGroup>
+		<None Include="firebase-key.json">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
 </Project>

@@ -29,32 +29,20 @@ try
 
     if (FirebaseApp.DefaultInstance == null)
     {
-        var firebaseConfig = builder.Configuration
-            .GetSection("Firebase")
-            .Get<Dictionary<string, object>>();
+        var path = Path.Combine(Directory.GetCurrentDirectory(), "firebase-key.json");
 
-        if (firebaseConfig != null && firebaseConfig.ContainsKey("private_key"))
+        if (!File.Exists(path))
         {
-            var privateKey = firebaseConfig["private_key"]?.ToString();
-
-            if (!string.IsNullOrEmpty(privateKey))
-            {
-                privateKey = privateKey.Replace("\\n", "\n");
-                firebaseConfig["private_key"] = privateKey;
-            }
-
-            FirebaseApp.Create(new AppOptions()
-            {
-                Credential = GoogleCredential.FromJson(
-                    JsonSerializer.Serialize(firebaseConfig)
-                )
-            });
-
-            Console.WriteLine("✅ Firebase OK");
+            Console.WriteLine("❌ firebase-key.json NOT FOUND");
         }
         else
         {
-            Console.WriteLine("⚠️ Firebase config missing");
+            FirebaseApp.Create(new AppOptions()
+            {
+                Credential = GoogleCredential.FromFile(path)
+            });
+
+            Console.WriteLine("✅ Firebase OK");
         }
     }
 }
