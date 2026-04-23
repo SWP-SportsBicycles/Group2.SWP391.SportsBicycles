@@ -54,6 +54,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             {
                 var bike = o.OrderItems.First().Bike;
 
+                decimal original = bike.OriginalPrice;
+                decimal payout = original - (original * 0.05m) - 100000;
+
                 return new SellerOrderDTO
                 {
                     OrderId = o.Id,
@@ -67,7 +70,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     BikeName = bike.Listing.Title,
                     Price = bike.Price,
 
-                    CreatedAt = o.CreatedAt
+                    CreatedAt = o.CreatedAt,
+                    IsDelivered = o.Status == OrderStatusEnum.Completed,
+                    IsPaidOut = o.PaidOutAt != null,
+                    PaidOutAt = o.PaidOutAt,
+                    PayoutAmount = payout
                 };
             });
 
