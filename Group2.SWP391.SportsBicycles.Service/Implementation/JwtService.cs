@@ -39,7 +39,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (string.IsNullOrWhiteSpace(secret))
                 throw new InvalidOperationException("JWT:Secret is missing in configuration.");
 
-            var expiresAt = DateTimeHelper.NowVN().AddDays(1);
+            var expiresAt = DateTimeHelper.NowVN().AddMinutes(15);
 
             var claims = new List<Claim>
             {
