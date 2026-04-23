@@ -17,18 +17,16 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
 
         // ================= SEARCH =================
         Task<ResponseDTO> SearchAsync(
-            string? keyword,
-            string? brand,
-            string? category,
-            decimal? minPrice,
-            decimal? maxPrice,
-            string? frameSize,
-            string? condition,
-            int pageNumber,
-            int pageSize);
-
-       
-       
+      string? keyword,
+      string? brand,
+      string? category,
+      decimal? minPrice,
+      decimal? maxPrice,
+      string? frameSize,
+      string? condition,
+      string? city,
+      int pageNumber,
+      int pageSize);
     }
 }
 
