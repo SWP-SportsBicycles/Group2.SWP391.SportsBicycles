@@ -14,7 +14,6 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public string SellerName { get; set; } = default!;
         public bool IsWishlisted { get; set; }
 
-        public SellerReviewDTO SellerReview { get; set; } = default!;
         public List<BikeDetailDTO> Bikes { get; set; } = new();
     
 }

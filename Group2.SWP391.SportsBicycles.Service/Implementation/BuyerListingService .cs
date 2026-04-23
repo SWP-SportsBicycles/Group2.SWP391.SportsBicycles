@@ -196,6 +196,7 @@ public class BuyerListingService : IBuyerListingService
     {
         var listing = await _listingRepo.AsQueryable()
             .Include(l => l.User)
+                .ThenInclude(u => u.SellerShippingProfiles)
             .Include(l => l.Bikes)
                 .ThenInclude(b => b.Medias)
             .Include(l => l.Bikes)
@@ -208,62 +209,10 @@ public class BuyerListingService : IBuyerListingService
             return Fail(BusinessCode.DATA_NOT_FOUND, "Listing không tồn tại");
 
         var currentUserId = GetUserId();
-        bool hasQualifiedOrder = false;
-
-        if (currentUserId != null)
-        {
-            hasQualifiedOrder = await _orderRepo.AsQueryable()
-                .AnyAsync(o =>
-                    o.UserId == currentUserId.Value &&
-                    (
-                        o.Status == OrderStatusEnum.Paid ||
-                        o.Status == OrderStatusEnum.Confirmed ||
-                        o.Status == OrderStatusEnum.Shipping ||
-                        o.Status == OrderStatusEnum.Completed
-                    ) &&
-                    o.OrderItems.Any(oi => oi.Bike != null && oi.Bike.ListingId == listingId));
-        }
 
         var bikes = listing.Bikes?
             .Where(b => b.Status == BikeStatusEnum.Available)
-            .Select(b => new BikeDetailDTO
-            {
-                BikeId = b.Id,
-                SerialNumber = b.SerialNumber,
-                Brand = b.Brand,
-                Category = b.Category,
-                Price = b.SalePrice,
-                FrameSize = b.FrameSize,
-                FrameMaterial = b.FrameMaterial,
-                Paint = b.Paint,
-                Groupset = b.Groupset,
-                Operating = b.Operating,
-                TireRim = b.TireRim,
-                BrakeType = b.BrakeType,
-                Overall = b.Overall,
-                Condition = b.Condition,
-                City = b.City,
-                Status = b.Status.ToString(),
-
-                // ✅ MEDIA CONTRACT CONSISTENT
-                Thumbnail = b.Medias!
-                    .Where(m => !string.IsNullOrEmpty(m.Image))
-                    .OrderBy(m => m.Type)
-                    .Select(m => m.Image!)
-                    .FirstOrDefault() ?? string.Empty,
-
-                Images = b.Medias!
-                    .Where(m => !string.IsNullOrEmpty(m.Image))
-                    .OrderBy(m => m.Type)
-                    .Select(m => m.Image!)
-                    .ToList(),
-
-                VideoUrls = b.Medias!
-                    .Where(m => !string.IsNullOrEmpty(m.VideoUrl))
-                    .OrderBy(m => m.Type)
-                    .Select(m => m.VideoUrl!)
-                    .ToList()
-            })
+            .Select(MapToBikeDetailDTO)
             .ToList() ?? new List<BikeDetailDTO>();
 
         var isWishlisted = false;
@@ -274,18 +223,26 @@ public class BuyerListingService : IBuyerListingService
                                b.Wishlists.Any(w => w.UserId == currentUserId.Value));
         }
 
+        var sellerProfile = listing.User?.SellerShippingProfiles?
+            .OrderByDescending(x => x.IsDefault)
+            .ThenByDescending(x => x.CreatedAt)
+            .FirstOrDefault();
+
+        var sellerName = !string.IsNullOrWhiteSpace(sellerProfile?.SenderName)
+            ? sellerProfile!.SenderName
+            : listing.User?.FullName ?? string.Empty;
+
         return Success(new BuyerListingDetailDTO
         {
             ListingId = listing.Id,
             Title = listing.Title,
             Description = listing.Description,
-            SellerName = hasQualifiedOrder ? listing.User?.FullName ?? string.Empty : string.Empty,
+            SellerName = sellerName,
             IsWishlisted = isWishlisted,
-            SellerReview = new SellerReviewDTO(), // nếu chưa có data thật thì set mặc định
             Bikes = bikes
         });
     }
-    // ================= SEARCH =================
+
     public async Task<ResponseDTO> SearchAsync(
         string? keyword,
         string? brand,
