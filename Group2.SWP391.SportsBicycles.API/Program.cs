@@ -74,6 +74,8 @@ builder.Services.AddHttpClient<IGhnLocationService, GhnLocationService>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
 builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
+builder.Services.AddScoped<IAdminUserService, AdminUserService>();
+builder.Services.AddScoped<IUserService, UserService>();
 
 builder.Services.AddScoped<IInspectorListingService, InspectorListingService>();
 

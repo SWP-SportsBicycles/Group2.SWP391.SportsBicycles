@@ -1,5 +1,6 @@
 ﻿using Group2.SWP391.SportsBicycles.Common.DTOs;
 using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
+using Group2.SWP391.SportsBicycles.Common.Helpers;
 using Group2.SWP391.SportsBicycles.DAL.Contract;
 using Group2.SWP391.SportsBicycles.DAL.Models;
 using Group2.SWP391.SportsBicycles.Services.Contract;
@@ -32,75 +33,170 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
         public async Task<ResponseDTO> UpsertAsync(Guid userId, SellerShippingProfileDTO dto)
         {
-            if (dto == null)
-                return Fail(BusinessCode.INVALID_DATA, "Data null");
+            ResponseDTO res = new ResponseDTO();
 
-            if (string.IsNullOrWhiteSpace(dto.SenderName) ||
-                string.IsNullOrWhiteSpace(dto.SenderPhone) ||
-                string.IsNullOrWhiteSpace(dto.SenderAddress))
+            try
             {
-                return Fail(BusinessCode.INVALID_DATA, "Thiếu thông tin người gửi");
-            }
-            if (dto.FromDistrictId <= 0 || string.IsNullOrWhiteSpace(dto.FromWardCode))
-                return Fail(BusinessCode.INVALID_DATA, "Thiếu thông tin địa chỉ");
-
-            // 🔥 VALIDATE BANK INFO
-            if (string.IsNullOrWhiteSpace(dto.BankName) ||
-                string.IsNullOrWhiteSpace(dto.BankAccountNumber) ||
-                string.IsNullOrWhiteSpace(dto.BankAccountName))
-            {
-                return Fail(BusinessCode.INVALID_DATA, "Thiếu thông tin tài khoản ngân hàng");
-            }
-
-            var profile = await _repo.AsQueryable()
-                .FirstOrDefaultAsync(x => x.UserId == userId && !x.IsDeleted);
-
-            if (profile == null)
-            {
-                profile = new SellerShippingProfile
+                if (dto == null)
                 {
-                    Id = Guid.NewGuid(),
-                    UserId = userId,
-                    SenderName = dto.SenderName.Trim(),
-                    SenderPhone = dto.SenderPhone.Trim(),
-                    SenderAddress = dto.SenderAddress.Trim(),
-                    FromDistrictId = dto.FromDistrictId,
-                    FromWardCode = dto.FromWardCode,
-                    BankName = dto.BankName.Trim(),
-                    BankAccountNumber = dto.BankAccountNumber.Trim(),
-                    BankAccountName = dto.BankAccountName.Trim(),
-                    CreatedAt = DateTime.UtcNow
+                    res.IsSucess = false;
+                    res.BusinessCode = BusinessCode.INVALID_DATA;
+                    res.Message = "Data null";
+                    return res;
+                }
+
+                if (string.IsNullOrWhiteSpace(dto.SenderName) ||
+                    string.IsNullOrWhiteSpace(dto.SenderPhone) ||
+                    string.IsNullOrWhiteSpace(dto.SenderAddress))
+                {
+                    res.IsSucess = false;
+                    res.BusinessCode = BusinessCode.INVALID_DATA;
+                    res.Message = "Thiếu thông tin người gửi";
+                    return res;
+                }
+
+                if (dto.FromDistrictId <= 0 || string.IsNullOrWhiteSpace(dto.FromWardCode))
+                {
+                    res.IsSucess = false;
+                    res.BusinessCode = BusinessCode.INVALID_DATA;
+                    res.Message = "Thiếu thông tin địa chỉ";
+                    return res;
+                }
+
+                if (!System.Text.RegularExpressions.Regex.IsMatch(dto.SenderPhone, @"^0\d{9}$"))
+                {
+                    res.IsSucess = false;
+                    res.BusinessCode = BusinessCode.INVALID_DATA;
+                    res.Message = "Số điện thoại không hợp lệ";
+                    return res;
+                }
+
+                if (string.IsNullOrWhiteSpace(dto.BankName) ||
+                    string.IsNullOrWhiteSpace(dto.BankAccountNumber) ||
+                    string.IsNullOrWhiteSpace(dto.BankAccountName))
+                {
+                    res.IsSucess = false;
+                    res.BusinessCode = BusinessCode.INVALID_DATA;
+                    res.Message = "Thiếu thông tin tài khoản ngân hàng";
+                    return res;
+                }
+
+                await _uow.BeginTransactionAsync();
+
+                var profile = await _repo.AsQueryable()
+                    .FirstOrDefaultAsync(x => x.UserId == userId && !x.IsDeleted);
+
+                if (profile == null)
+                {
+                    profile = new SellerShippingProfile
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = userId,
+                        SenderName = dto.SenderName.Trim(),
+                        SenderPhone = dto.SenderPhone.Trim(),
+                        SenderAddress = dto.SenderAddress.Trim(),
+                        FromDistrictId = dto.FromDistrictId,
+                        FromWardCode = dto.FromWardCode,
+                        BankName = dto.BankName.Trim(),
+                        BankAccountNumber = dto.BankAccountNumber.Trim(),
+                        BankAccountName = dto.BankAccountName.Trim(),
+                        CreatedAt = DateTimeHelper.NowVN()
+                    };
+
+                    await _repo.Insert(profile);
+                }
+                else
+                {
+                    profile.SenderName = dto.SenderName.Trim();
+                    profile.SenderPhone = dto.SenderPhone.Trim();
+                    profile.SenderAddress = dto.SenderAddress.Trim();
+                    profile.FromDistrictId = dto.FromDistrictId;
+                    profile.FromWardCode = dto.FromWardCode;
+                    profile.BankName = dto.BankName.Trim();
+                    profile.BankAccountNumber = dto.BankAccountNumber.Trim();
+                    profile.BankAccountName = dto.BankAccountName.Trim();
+                    profile.UpdatedAt = DateTimeHelper.NowVN();
+                }
+
+                await _uow.SaveChangeAsync();
+                await _uow.CommitAsync();
+
+                // ✅ response sạch
+                res.IsSucess = true;
+                res.BusinessCode = BusinessCode.UPDATE_SUCESSFULLY;
+                res.Message = "Lưu profile thành công";
+                res.Data = new
+                {
+                    profile.Id,
+                    profile.SenderName,
+                    profile.SenderPhone,
+                    profile.SenderAddress,
+                    profile.FromDistrictId,
+                    profile.FromWardCode,
+                    profile.BankName,
+                    profile.BankAccountNumber,
+                    profile.BankAccountName,
+                    profile.IsDefault
                 };
-
-                await _repo.Insert(profile);
             }
-            else
+            catch (Exception ex)
             {
-                profile.SenderName = dto.SenderName.Trim();
-                profile.SenderPhone = dto.SenderPhone.Trim();
-                profile.SenderAddress = dto.SenderAddress.Trim();
-                profile.FromDistrictId = dto.FromDistrictId;
-                profile.FromWardCode = dto.FromWardCode;
-                profile.BankName = dto.BankName.Trim();
-                profile.BankAccountNumber = dto.BankAccountNumber.Trim();
-                profile.BankAccountName = dto.BankAccountName.Trim();
-                profile.UpdatedAt = DateTime.UtcNow;
+                await _uow.RollbackAsync();
+
+                res.IsSucess = false;
+                res.BusinessCode = BusinessCode.EXCEPTION;
+                res.Message = "Lỗi: " + ex.Message;
             }
 
-            await _uow.SaveChangeAsync();
-
-            return Success();
+            return res;
         }
 
         public async Task<ResponseDTO> GetMyProfileAsync(Guid userId)
         {
-            var profile = await _repo.AsQueryable()
-               .FirstOrDefaultAsync(x => x.UserId == userId && !x.IsDeleted);
+            ResponseDTO res = new ResponseDTO();
 
-            if (profile == null)
-                return Fail(BusinessCode.DATA_NOT_FOUND, "Chưa có profile");
+            try
+            {
+                var profile = await _repo.AsQueryable()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.UserId == userId && !x.IsDeleted);
 
-            return Success(profile);
+                if (profile == null)
+                {
+                    res.IsSucess = false;
+                    res.BusinessCode = BusinessCode.DATA_NOT_FOUND;
+                    res.Message = "Chưa có profile";
+                    return res;
+                }
+
+                res.IsSucess = true;
+                res.BusinessCode = BusinessCode.GET_DATA_SUCCESSFULLY;
+                res.Message = "Lấy profile thành công";
+                res.Data = new
+                {
+                    profile.Id,
+                    profile.SenderName,
+                    profile.SenderPhone,
+                    profile.SenderAddress,
+                    profile.FromDistrictId,
+                    profile.FromWardCode,
+                    FromWardName = profile.FromWardName ?? "",
+                    FromDistrictName = profile.FromDistrictName ?? "",
+                    FromProvinceName = profile.FromProvinceName ?? "",
+                    profile.BankName,
+                    profile.BankAccountNumber,
+                    profile.BankAccountName,
+                    profile.IsDefault
+                };
+            }
+            catch (Exception ex)
+            {
+                res.IsSucess = false;
+                res.BusinessCode = BusinessCode.EXCEPTION;
+                res.Message = "Lỗi: " + ex.Message;
+            }
+
+            return res;
         }
     }
 }

@@ -33,14 +33,14 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
         public async Task<IActionResult> Upsert([FromBody] SellerShippingProfileDTO dto)
         {
             var result = await _service.UpsertAsync(GetUserId(), dto);
-            return Ok(result);
+            return StatusCode(result.IsSucess ? 200 : 400, result);
         }
 
         [HttpGet]
         public async Task<IActionResult> GetMyProfile()
         {
             var result = await _service.GetMyProfileAsync(GetUserId());
-            return Ok(result);
+            return StatusCode(result.IsSucess ? 200 : 404, result);
         }
     }
 }

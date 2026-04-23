@@ -16,6 +16,7 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public string BuyerPhone { get; set; }
 
         public string ReceiverAddress { get; set; }
+        public Guid ListingId { get; set; }
 
         public string BikeName { get; set; }
         public decimal Price { get; set; }
