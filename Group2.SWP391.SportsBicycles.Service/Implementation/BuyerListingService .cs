@@ -31,7 +31,7 @@ public class BuyerListingService : IBuyerListingService
     private Guid? GetUserId()
     {
         var id = _http.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
-        return string.IsNullOrWhiteSpace(id) ? null : Guid.Parse(id);
+        return Guid.TryParse(id, out var userId) ? userId : null;
     }
 
     private static ResponseDTO Success(object? data = null)
@@ -50,29 +50,9 @@ public class BuyerListingService : IBuyerListingService
             Message = msg
         };
 
-    private static bool IsOrderActiveForListing(OrderStatusEnum status)
-    {
-        return status == OrderStatusEnum.Pending
-            || status == OrderStatusEnum.Paid
-            || status == OrderStatusEnum.Confirmed
-            || status == OrderStatusEnum.Shipping;
-    }
-
-    private static bool IsBuyerAllowedToViewSellerPII(OrderStatusEnum status)
-    {
-        // Theo SRS: chỉ lộ PII sau khi cọc/đơn đã được xác nhận hợp lệ.
-        // Với enum hiện tại của bạn, dùng Paid trở lên là hợp lý nhất.
-        return status == OrderStatusEnum.Paid
-            || status == OrderStatusEnum.Confirmed
-            || status == OrderStatusEnum.Shipping
-            || status == OrderStatusEnum.Completed;
-    }
-
     private async Task<List<Guid>> GetActiveListingIdsAsync()
     {
         return await _orderRepo.AsQueryable()
-            .Include(o => o.OrderItems)
-                .ThenInclude(oi => oi.Bike)
             .Where(o =>
                 o.Status == OrderStatusEnum.Pending ||
                 o.Status == OrderStatusEnum.Paid ||
@@ -165,58 +145,64 @@ public class BuyerListingService : IBuyerListingService
             return Fail(BusinessCode.DATA_NOT_FOUND, "Listing không tồn tại");
 
         var currentUserId = GetUserId();
-        var activeListingIds = await GetActiveListingIdsAsync();
-
-        // Nếu listing đang có giao dịch active thì vẫn có thể xem detail,
-        // nhưng không nên cho đặt mua mới ở tầng khác.
-        // Ở đây chỉ cần xử lý đúng phần hiển thị.
         bool hasQualifiedOrder = false;
 
         if (currentUserId != null)
         {
             hasQualifiedOrder = await _orderRepo.AsQueryable()
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Bike)
                 .AnyAsync(o =>
                     o.UserId == currentUserId.Value &&
-                    IsBuyerAllowedToViewSellerPII(o.Status) &&
-                    o.OrderItems.Any(oi => oi.Bike.ListingId == listingId));
+                    (
+                        o.Status == OrderStatusEnum.Paid ||
+                        o.Status == OrderStatusEnum.Confirmed ||
+                        o.Status == OrderStatusEnum.Shipping ||
+                        o.Status == OrderStatusEnum.Completed
+                    ) &&
+                    o.OrderItems.Any(oi => oi.Bike != null && oi.Bike.ListingId == listingId));
         }
 
-        var bikes = listing.Bikes?.Select(b => new BikeDetailDTO
-        {
-            BikeId = b.Id,
-            Brand = b.Brand,
-            Category = b.Category,
-            Price = b.SalePrice,
-            FrameSize = b.FrameSize,
-            Overall = b.Overall
-        }).ToList() ?? new List<BikeDetailDTO>();
+        var bikes = listing.Bikes?
+     .Where(b => b.Status == BikeStatusEnum.Available)
+     .Select(b => new BikeDetailDTO
+     {
+         BikeId = b.Id,
+         Brand = b.Brand,
+         Category = b.Category,
+         Price = b.SalePrice,
+         FrameSize = b.FrameSize,
+         FrameMaterial = b.FrameMaterial,
+         Paint = b.Paint,
+         Groupset = b.Groupset,
+         Operating = b.Operating,
+         TireRim = b.TireRim,
+         BrakeType = b.BrakeType,
+         Overall = b.Overall,
+         Condition = b.Condition,
+         City = b.City
+     }).ToList() ?? new List<BikeDetailDTO>();
 
         return Success(new BuyerListingDetailDTO
         {
             ListingId = listing.Id,
             Title = listing.Title,
             Description = listing.Description,
-
-            // Theo SRS: chỉ lộ thông tin seller sau khi buyer có order/cọc hợp lệ
             SellerName = hasQualifiedOrder ? listing.User?.FullName : null,
-
             Bikes = bikes
         });
     }
 
     // ================= SEARCH =================
     public async Task<ResponseDTO> SearchAsync(
-        string? keyword,
-        string? brand,
-        string? category,
-        decimal? minPrice,
-        decimal? maxPrice,
-        string? frameSize,
-        string? condition,
-        int pageNumber,
-        int pageSize)
+      string? keyword,
+      string? brand,
+      string? category,
+      decimal? minPrice,
+      decimal? maxPrice,
+      string? frameSize,
+      string? condition,
+      string? city,
+      int pageNumber,
+      int pageSize)
     {
         if (pageNumber <= 0 || pageSize <= 0)
             return Fail(BusinessCode.INVALID_INPUT, "Invalid pagination");
@@ -234,8 +220,13 @@ public class BuyerListingService : IBuyerListingService
             keyword = keyword.Trim();
             query = query.Where(b =>
                 b.Listing.Title.Contains(keyword) ||
+                b.Listing.Description.Contains(keyword) ||
                 b.Brand.Contains(keyword) ||
-                b.Category.Contains(keyword));
+                b.Category.Contains(keyword) ||
+                b.FrameSize.Contains(keyword) ||
+                b.FrameMaterial.Contains(keyword) ||
+                b.City.Contains(keyword) ||
+                b.Condition.Contains(keyword));
         }
 
         if (!string.IsNullOrWhiteSpace(brand))
@@ -251,10 +242,14 @@ public class BuyerListingService : IBuyerListingService
         }
 
         if (minPrice.HasValue)
-            query = query.Where(b => b.Price >= minPrice.Value);
+        {
+            query = query.Where(b => b.SalePrice >= minPrice.Value);
+        }
 
         if (maxPrice.HasValue)
-            query = query.Where(b => b.Price <= maxPrice.Value);
+        {
+            query = query.Where(b => b.SalePrice <= maxPrice.Value);
+        }
 
         if (!string.IsNullOrWhiteSpace(frameSize))
         {
@@ -304,8 +299,4 @@ public class BuyerListingService : IBuyerListingService
             PageSize = pageSize
         });
     }
-
-
-
-
 }

@@ -9,7 +9,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
 {
     [ApiController]
     [Route("api/buyer-listing")]
-    [Authorize(Roles = "BUYER")]
+    [AllowAnonymous]
 
     public class BuyerListingController : ControllerBase
     {
@@ -21,6 +21,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
         }
 
         // ================= LIST =================
+
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] int pageNumber = 1,
@@ -41,24 +42,29 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
         // ================= SEARCH =================
         [HttpGet("search")]
         public async Task<IActionResult> Search(
-            [FromQuery] string? keyword,
-            [FromQuery] string? brand,
-            [FromQuery] string? category,
-            [FromQuery] decimal? minPrice,
-            [FromQuery] decimal? maxPrice,
-            [FromQuery] string? frameSize,
-            [FromQuery] string? condition,
-            [FromQuery] int pageNumber = 1,
-            [FromQuery] int pageSize = 10)
+        [FromQuery] string? keyword,
+        [FromQuery] string? brand,
+        [FromQuery] string? category,
+        [FromQuery] decimal? minPrice,
+        [FromQuery] decimal? maxPrice,
+        [FromQuery] string? frameSize,
+        [FromQuery] string? condition,
+        [FromQuery] string? city,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10)
         {
+            if (pageNumber <= 0) pageNumber = 1;
+            if (pageSize <= 0) pageSize = 10;
+
             var result = await _service.SearchAsync(
-                keyword,
-                brand,
-                category,
+                keyword?.Trim(),
+                brand?.Trim(),
+                category?.Trim(),
                 minPrice,
                 maxPrice,
-                frameSize,
-                condition,
+                frameSize?.Trim(),
+                condition?.Trim(),
+                city?.Trim(),
                 pageNumber,
                 pageSize
             );
@@ -66,7 +72,6 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
             return HandleResult(result);
         }
 
-      
         // ================= HANDLE RESULT =================
         private IActionResult HandleResult(ResponseDTO result)
         {
