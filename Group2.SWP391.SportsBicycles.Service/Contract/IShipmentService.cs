@@ -14,5 +14,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
         Task<ResponseDTO> SyncTrackingAsync(Guid orderId);
         Task<ResponseDTO> ConfirmReceivedAsync(Guid buyerId, Guid orderId);
 
+
+
     }
 }

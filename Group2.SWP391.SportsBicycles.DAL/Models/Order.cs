@@ -48,5 +48,7 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
         public DateTime? SellerNotifiedAt { get; set; }
         public DateTime? PayoutEligibleAt { get; set; }
         public DateTime? PaidOutAt { get; set; }
+
+        public RefundInfo? RefundInfo { get; set; }
     }
 }
