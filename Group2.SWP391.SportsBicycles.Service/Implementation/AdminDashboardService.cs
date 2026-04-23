@@ -47,6 +47,139 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 Message = msg
             };
 
+        //public async Task<ResponseDTO> GetDashboardAsync()
+        //{
+        //    try
+        //    {
+        //        var now = DateTime.UtcNow;
+        //        var lastMonth = now.AddMonths(-1);
+
+        //        // ===== LISTING =====
+        //        var listingQuery = _listingRepo.AsQueryable()
+        //            .Where(x => !x.IsDeleted);
+
+        //        var totalListings = await listingQuery.CountAsync();
+
+        //        var activeListings = await listingQuery
+        //            .CountAsync(x => x.Status == ListingStatusEnum.Published);
+
+        //        // ===== USER =====
+        //        var userQuery = _userRepo.AsQueryable();
+
+        //        var totalUsers = await userQuery.CountAsync();
+
+        //        var totalSellers = await userQuery
+        //            .CountAsync(x => x.Role == RoleEnum.SELLER);
+
+        //        // ================= REVENUE (🔥 FIX CHUẨN) =================
+
+        //        var currentMonthOrders = await _orderRepo.AsQueryable()
+        //            .Include(o => o.OrderItems)
+        //                .ThenInclude(oi => oi.Bike)
+        //            .Where(o =>
+        //                o.Status == OrderStatusEnum.Completed &&
+        //                o.CompletedAt.HasValue &&
+        //                o.CompletedAt.Value.Month == now.Month &&
+        //                o.CompletedAt.Value.Year == now.Year)
+        //            .ToListAsync();
+
+        //        decimal buyerFeeRevenue = 0;
+        //        decimal sellerFeeRevenue = 0;
+        //        decimal inspectionRevenue = 0;
+
+        //        foreach (var order in currentMonthOrders)
+        //        {
+        //            var bike = order.OrderItems.First().Bike;
+        //            var originalPrice = bike.OriginalPrice;
+
+        //            buyerFeeRevenue += originalPrice * 0.05m;
+        //            sellerFeeRevenue += originalPrice * 0.05m;
+        //            inspectionRevenue += 100000;
+        //        }
+
+        //        decimal totalRevenue = buyerFeeRevenue + sellerFeeRevenue + inspectionRevenue;
+
+        //        // ===== LAST MONTH =====
+        //        var lastMonthOrders = await _orderRepo.AsQueryable()
+        //            .Include(o => o.OrderItems)
+        //                .ThenInclude(oi => oi.Bike)
+        //            .Where(o =>
+        //                o.Status == OrderStatusEnum.Completed &&
+        //                o.CompletedAt.HasValue &&
+        //                o.CompletedAt.Value.Month == lastMonth.Month &&
+        //                o.CompletedAt.Value.Year == lastMonth.Year)
+        //            .ToListAsync();
+
+        //        decimal lastMonthRevenue = 0;
+
+        //        foreach (var order in lastMonthOrders)
+        //        {
+        //            var bike = order.OrderItems.First().Bike;
+        //            var originalPrice = bike.OriginalPrice;
+
+        //            lastMonthRevenue += (originalPrice * 0.05m) // buyer
+        //                              + (originalPrice * 0.05m) // seller
+        //                              + 100000; // inspection
+        //        }
+
+        //        double growthPercent = 0;
+
+        //        if (lastMonthRevenue > 0)
+        //        {
+        //            growthPercent = (double)((totalRevenue - lastMonthRevenue)
+        //                / lastMonthRevenue * 100);
+        //        }
+
+        //        // ===== CITY =====
+        //        var cities = new[] { "Hà Nội", "TP.HCM", "Đà Nẵng" };
+
+        //        var cityStats = new List<CityStatsDTO>();
+
+        //        foreach (var city in cities)
+        //        {
+        //            var listingCount = await listingQuery
+        //                .CountAsync(x => x.City == city);
+
+        //            var orderCount = await _orderRepo.AsQueryable()
+        //                .Include(o => o.OrderItems)
+        //                    .ThenInclude(oi => oi.Bike)
+        //                .CountAsync(o =>
+        //                    o.OrderItems.Any(oi =>
+        //                        oi.Bike != null &&
+        //                        oi.Bike.City == city));
+
+        //            cityStats.Add(new CityStatsDTO
+        //            {
+        //                City = city,
+        //                Listings = listingCount,
+        //                Orders = orderCount
+        //            });
+        //        }
+
+        //        // ===== RESULT =====
+        //        var result = new AdminDashboardDTO
+        //        {
+        //            TotalListings = totalListings,
+        //            ActiveListings = activeListings,
+        //            TotalUsers = totalUsers,
+        //            TotalSellers = totalSellers,
+
+
+        //            BuyerFeeRevenue = buyerFeeRevenue,
+        //            SellerFeeRevenue = sellerFeeRevenue,
+        //            InspectionRevenue = inspectionRevenue,
+        //            MonthlyRevenue = totalRevenue,
+
+        //            RevenueGrowthPercent = Math.Round(growthPercent, 2),
+        //            Cities = cityStats
+        //        };
+
+        //        return Success(result);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return Fail("Lỗi dashboard: " + ex.Message);
+        //    }
         public async Task<ResponseDTO> GetDashboardAsync()
         {
             try
@@ -69,34 +202,86 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 var totalUsers = await userQuery.CountAsync();
 
                 var totalSellers = await userQuery
-                    .CountAsync(x => x.Role == RoleEnum.SELLER); // sửa nếu enum
+                    .CountAsync(x => x.Role == RoleEnum.SELLER);
 
-                // ===== REVENUE (🔥 chuẩn Transaction) =====
-                var currentMonthRevenue = await _transactionRepo.AsQueryable()
-                    .Where(x =>
-                        x.Status == TransactionStatusEnum.Paid &&
-                        x.PaidAt.HasValue &&
-                        x.PaidAt.Value.Month == now.Month &&
-                        x.PaidAt.Value.Year == now.Year)
-                    .SumAsync(x => (decimal?)x.Amount) ?? 0;
+                // ================= REVENUE (🔥 FIX CHUẨN) =================
 
-                var lastMonthRevenue = await _transactionRepo.AsQueryable()
-                    .Where(x =>
-                        x.Status == TransactionStatusEnum.Paid &&
-                        x.PaidAt.HasValue &&
-                        x.PaidAt.Value.Month == lastMonth.Month &&
-                        x.PaidAt.Value.Year == lastMonth.Year)
-                    .SumAsync(x => (decimal?)x.Amount) ?? 0;
+                var currentMonthOrders = await _orderRepo.AsQueryable()
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Bike)
+                    .Include(o => o.Transaction)
+                    .Where(o =>
+                        o.Status == OrderStatusEnum.Completed &&
+                        o.Transaction != null &&
+                        o.Transaction.Status == TransactionStatusEnum.Paid &&
+                        o.Transaction.PaidAt.HasValue &&
+                        o.Transaction.PaidAt.Value.Month == now.Month &&
+                        o.Transaction.PaidAt.Value.Year == now.Year)
+                    .ToListAsync();
+
+                decimal buyerFeeRevenue = 0;
+                decimal sellerFeeRevenue = 0;
+                decimal inspectionRevenue = 0;
+
+                foreach (var order in currentMonthOrders)
+                {
+                    var bike = order.OrderItems.First().Bike;
+
+                    decimal originalPrice = bike.OriginalPrice;
+                    decimal paidAmount = order.Transaction.Amount;
+
+                    // 🔥 BUYER FEE (CHUẨN)
+                    buyerFeeRevenue += (paidAmount - originalPrice);
+
+                    // 🔥 SELLER FEE
+                    sellerFeeRevenue += originalPrice * 0.05m;
+
+                    // 🔥 INSPECTION
+                    inspectionRevenue += 100000;
+                }
+
+                decimal totalRevenue = buyerFeeRevenue + sellerFeeRevenue + inspectionRevenue;
+
+                // ================= LAST MONTH =================
+
+                var lastMonthOrders = await _orderRepo.AsQueryable()
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Bike)
+                    .Include(o => o.Transaction)
+                    .Where(o =>
+                        o.Status == OrderStatusEnum.Completed &&
+                        o.Transaction != null &&
+                        o.Transaction.Status == TransactionStatusEnum.Paid &&
+                        o.Transaction.PaidAt.HasValue &&
+                        o.Transaction.PaidAt.Value.Month == lastMonth.Month &&
+                        o.Transaction.PaidAt.Value.Year == lastMonth.Year)
+                    .ToListAsync();
+
+                decimal lastMonthRevenue = 0;
+
+                foreach (var order in lastMonthOrders)
+                {
+                    var bike = order.OrderItems.First().Bike;
+
+                    decimal originalPrice = bike.OriginalPrice;
+                    decimal paidAmount = order.Transaction.Amount;
+
+                    decimal buyerFee = (paidAmount - originalPrice);
+                    decimal sellerFee = originalPrice * 0.05m;
+                    decimal inspection = 100000;
+
+                    lastMonthRevenue += buyerFee + sellerFee + inspection;
+                }
 
                 double growthPercent = 0;
 
                 if (lastMonthRevenue > 0)
                 {
-                    growthPercent = (double)((currentMonthRevenue - lastMonthRevenue)
+                    growthPercent = (double)((totalRevenue - lastMonthRevenue)
                         / lastMonthRevenue * 100);
                 }
 
-                // ===== CITY STATS =====
+                // ===== CITY =====
                 var cities = new[] { "Hà Nội", "TP.HCM", "Đà Nẵng" };
 
                 var cityStats = new List<CityStatsDTO>();
@@ -122,13 +307,19 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     });
                 }
 
+                // ===== RESULT =====
                 var result = new AdminDashboardDTO
                 {
                     TotalListings = totalListings,
                     ActiveListings = activeListings,
                     TotalUsers = totalUsers,
                     TotalSellers = totalSellers,
-                    MonthlyRevenue = currentMonthRevenue,
+
+                    BuyerFeeRevenue = buyerFeeRevenue,
+                    SellerFeeRevenue = sellerFeeRevenue,
+                    InspectionRevenue = inspectionRevenue,
+                    MonthlyRevenue = totalRevenue,
+
                     RevenueGrowthPercent = Math.Round(growthPercent, 2),
                     Cities = cityStats
                 };

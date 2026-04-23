@@ -66,7 +66,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     BuyerName = o.ReceiverName,
                     BuyerPhone = o.ReceiverPhone,
                     ReceiverAddress = o.ReceiverAddress,
-
+                    ListingId = bike.Listing.Id,
                     BikeName = bike.Listing.Title,
                     Price = bike.Price,
 
