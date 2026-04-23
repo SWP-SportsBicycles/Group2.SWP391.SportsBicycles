@@ -22,6 +22,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
 
         // ================= LIST =================
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAll(
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10)
@@ -32,6 +33,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
 
         // ================= DETAIL =================
         [HttpGet("{listingId}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetDetail(Guid listingId)
         {
             var result = await _service.GetDetail(listingId);
@@ -40,6 +42,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
 
         // ================= SEARCH =================
         [HttpGet("search")]
+        [AllowAnonymous]
         public async Task<IActionResult> Search(
             [FromQuery] string? keyword,
             [FromQuery] string? brand,

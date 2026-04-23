@@ -21,5 +21,10 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public decimal Price { get; set; }
 
         public DateTime CreatedAt { get; set; }
+        public bool IsDelivered { get; set; }
+        public bool IsPaidOut { get; set; }
+        public DateTime? PaidOutAt { get; set; }
+
+        public decimal PayoutAmount { get; set; }
     }
 }
