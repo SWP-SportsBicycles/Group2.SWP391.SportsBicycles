@@ -27,7 +27,6 @@ public class BuyerListingService : IBuyerListingService
         _http = http;
     }
 
-    // ================= HELPER =================
     private Guid? GetUserId()
     {
         var id = _http.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -80,6 +79,85 @@ public class BuyerListingService : IBuyerListingService
                 !activeListingIds.Contains(b.ListingId));
     }
 
+    // ===== MEDIA HELPER =====
+    private static string GetThumbnail(Bike bike)
+    {
+        return bike.Medias?
+            .Where(m => !string.IsNullOrWhiteSpace(m.Image))
+            .OrderBy(m => m.Type)
+            .Select(m => m.Image!)
+            .FirstOrDefault()
+            ?? string.Empty;
+    }
+
+    private static List<string> GetImages(Bike bike)
+    {
+        return bike.Medias?
+            .Where(m => !string.IsNullOrWhiteSpace(m.Image))
+            .OrderBy(m => m.Type)
+            .Select(m => m.Image!)
+            .Distinct()
+            .ToList()
+            ?? new List<string>();
+    }
+
+    private static List<string> GetVideoUrls(Bike bike)
+    {
+        return bike.Medias?
+            .Where(m => !string.IsNullOrWhiteSpace(m.VideoUrl))
+            .OrderBy(m => m.Type)
+            .Select(m => m.VideoUrl!)
+            .Distinct()
+            .ToList()
+            ?? new List<string>();
+    }
+
+    private static BuyerBikeListingDTO MapToBuyerBikeListingDTO(Bike b, Guid? currentUserId)
+    {
+        return new BuyerBikeListingDTO
+        {
+            BikeId = b.Id,
+            ListingId = b.ListingId,
+            Title = b.Listing?.Title ?? string.Empty,
+            Price = b.SalePrice,
+            Brand = b.Brand,
+            Category = b.Category,
+            Thumbnail = GetThumbnail(b),
+            Overall = b.Overall,
+            IsInspected = b.Inspection != null,
+            IsWishlisted = currentUserId != null &&
+                           b.Wishlists != null &&
+                           b.Wishlists.Any(w => w.UserId == currentUserId.Value)
+        };
+    }
+
+    private static BikeDetailDTO MapToBikeDetailDTO(Bike b)
+    {
+        return new BikeDetailDTO
+        {
+            BikeId = b.Id,
+            SerialNumber = b.SerialNumber,
+            Brand = b.Brand,
+            Category = b.Category,
+            Price = b.SalePrice,
+            FrameSize = b.FrameSize,
+            FrameMaterial = b.FrameMaterial,
+            Paint = b.Paint,
+            Groupset = b.Groupset,
+            Operating = b.Operating,
+            TireRim = b.TireRim,
+            BrakeType = b.BrakeType,
+            Overall = b.Overall,
+            Condition = b.Condition,
+            City = b.City,
+            Status = b.Status.ToString(),
+
+            Thumbnail = GetThumbnail(b),
+            Images = GetImages(b),
+            VideoUrls = GetVideoUrls(b)
+        };
+    }
+
     // ================= LIST =================
     public async Task<ResponseDTO> GetAllAsync(int pageNumber, int pageSize)
     {
@@ -99,24 +177,9 @@ public class BuyerListingService : IBuyerListingService
             .Take(pageSize)
             .ToListAsync();
 
-        var items = bikes.Select(b => new BuyerBikeListingDTO
-        {
-            BikeId = b.Id,
-            ListingId = b.ListingId,
-            Title = b.Listing?.Title ?? string.Empty,
-            Price = b.SalePrice,
-            Brand = b.Brand,
-            Category = b.Category,
-            Thumbnail = b.Medias?
-                .OrderBy(m => m.Type)
-                .Select(m => m.Image)
-                .FirstOrDefault() ?? string.Empty,
-            Overall = b.Overall,
-            IsInspected = b.Inspection != null,
-            IsWishlisted = currentUserId != null &&
-                           b.Wishlists != null &&
-                           b.Wishlists.Any(w => w.UserId == currentUserId.Value)
-        }).ToList();
+        var items = bikes
+            .Select(b => MapToBuyerBikeListingDTO(b, currentUserId))
+            .ToList();
 
         return Success(new
         {
@@ -162,47 +225,78 @@ public class BuyerListingService : IBuyerListingService
         }
 
         var bikes = listing.Bikes?
-     .Where(b => b.Status == BikeStatusEnum.Available)
-     .Select(b => new BikeDetailDTO
-     {
-         BikeId = b.Id,
-         Brand = b.Brand,
-         Category = b.Category,
-         Price = b.SalePrice,
-         FrameSize = b.FrameSize,
-         FrameMaterial = b.FrameMaterial,
-         Paint = b.Paint,
-         Groupset = b.Groupset,
-         Operating = b.Operating,
-         TireRim = b.TireRim,
-         BrakeType = b.BrakeType,
-         Overall = b.Overall,
-         Condition = b.Condition,
-         City = b.City
-     }).ToList() ?? new List<BikeDetailDTO>();
+            .Where(b => b.Status == BikeStatusEnum.Available)
+            .Select(b => new BikeDetailDTO
+            {
+                BikeId = b.Id,
+                SerialNumber = b.SerialNumber,
+                Brand = b.Brand,
+                Category = b.Category,
+                Price = b.SalePrice,
+                FrameSize = b.FrameSize,
+                FrameMaterial = b.FrameMaterial,
+                Paint = b.Paint,
+                Groupset = b.Groupset,
+                Operating = b.Operating,
+                TireRim = b.TireRim,
+                BrakeType = b.BrakeType,
+                Overall = b.Overall,
+                Condition = b.Condition,
+                City = b.City,
+                Status = b.Status.ToString(),
+
+                // ✅ MEDIA CONTRACT CONSISTENT
+                Thumbnail = b.Medias!
+                    .Where(m => !string.IsNullOrEmpty(m.Image))
+                    .OrderBy(m => m.Type)
+                    .Select(m => m.Image!)
+                    .FirstOrDefault() ?? string.Empty,
+
+                Images = b.Medias!
+                    .Where(m => !string.IsNullOrEmpty(m.Image))
+                    .OrderBy(m => m.Type)
+                    .Select(m => m.Image!)
+                    .ToList(),
+
+                VideoUrls = b.Medias!
+                    .Where(m => !string.IsNullOrEmpty(m.VideoUrl))
+                    .OrderBy(m => m.Type)
+                    .Select(m => m.VideoUrl!)
+                    .ToList()
+            })
+            .ToList() ?? new List<BikeDetailDTO>();
+
+        var isWishlisted = false;
+        if (currentUserId != null)
+        {
+            isWishlisted = await _bikeRepo.AsQueryable()
+                .AnyAsync(b => b.ListingId == listingId &&
+                               b.Wishlists.Any(w => w.UserId == currentUserId.Value));
+        }
 
         return Success(new BuyerListingDetailDTO
         {
             ListingId = listing.Id,
             Title = listing.Title,
             Description = listing.Description,
-            SellerName = hasQualifiedOrder ? listing.User?.FullName : null,
+            SellerName = hasQualifiedOrder ? listing.User?.FullName ?? string.Empty : string.Empty,
+            IsWishlisted = isWishlisted,
+            SellerReview = new SellerReviewDTO(), // nếu chưa có data thật thì set mặc định
             Bikes = bikes
         });
     }
-
     // ================= SEARCH =================
     public async Task<ResponseDTO> SearchAsync(
-      string? keyword,
-      string? brand,
-      string? category,
-      decimal? minPrice,
-      decimal? maxPrice,
-      string? frameSize,
-      string? condition,
-      string? city,
-      int pageNumber,
-      int pageSize)
+        string? keyword,
+        string? brand,
+        string? category,
+        decimal? minPrice,
+        decimal? maxPrice,
+        string? frameSize,
+        string? condition,
+        string? city,
+        int pageNumber,
+        int pageSize)
     {
         if (pageNumber <= 0 || pageSize <= 0)
             return Fail(BusinessCode.INVALID_INPUT, "Invalid pagination");
@@ -263,6 +357,13 @@ public class BuyerListingService : IBuyerListingService
             query = query.Where(b => b.Condition == condition);
         }
 
+        // FIX: city filter đang thiếu
+        if (!string.IsNullOrWhiteSpace(city))
+        {
+            city = city.Trim();
+            query = query.Where(b => b.City == city);
+        }
+
         var totalItems = await query.CountAsync();
 
         var bikes = await query
@@ -271,24 +372,9 @@ public class BuyerListingService : IBuyerListingService
             .Take(pageSize)
             .ToListAsync();
 
-        var items = bikes.Select(b => new BuyerBikeListingDTO
-        {
-            BikeId = b.Id,
-            ListingId = b.ListingId,
-            Title = b.Listing?.Title ?? string.Empty,
-            Price = b.SalePrice,
-            Brand = b.Brand,
-            Category = b.Category,
-            Thumbnail = b.Medias?
-                .OrderBy(m => m.Type)
-                .Select(m => m.Image)
-                .FirstOrDefault() ?? string.Empty,
-            Overall = b.Overall,
-            IsInspected = b.Inspection != null,
-            IsWishlisted = currentUserId != null &&
-                           b.Wishlists != null &&
-                           b.Wishlists.Any(w => w.UserId == currentUserId.Value)
-        }).ToList();
+        var items = bikes
+            .Select(b => MapToBuyerBikeListingDTO(b, currentUserId))
+            .ToList();
 
         return Success(new
         {
