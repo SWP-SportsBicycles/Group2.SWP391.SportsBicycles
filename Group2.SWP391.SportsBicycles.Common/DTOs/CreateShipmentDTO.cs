@@ -11,29 +11,16 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
     {
         public string ShippingProvider { get; set; } = default!;
 
-        public string SenderName { get; set; } = default!;
-        public string SenderPhone { get; set; } = default!;
-        public string SenderAddress { get; set; } = default!;
-
-        public int FromProvinceId { get; set; }
-        public int FromDistrictId { get; set; }
-        public string? FromWardCode { get; set; }
-
-        public string? FromProvinceName { get; set; }
-        public string? FromDistrictName { get; set; }
-        public string? FromWardName { get; set; }
-
         public int ToProvinceId { get; set; }
         public int ToDistrictId { get; set; }
         public string ToWardCode { get; set; } = default!;
-
         public string? ToProvinceName { get; set; }
         public string? ToDistrictName { get; set; }
         public string? ToWardName { get; set; }
 
-        public decimal DistanceKm { get; set; }
+        public double DistanceKm { get; set; }
         public string? Note { get; set; }
-        public int CodAmount { get; set; } = 0;
+        public decimal CodAmount { get; set; }
     }
     public class ShipmentTrackingDTO
     {

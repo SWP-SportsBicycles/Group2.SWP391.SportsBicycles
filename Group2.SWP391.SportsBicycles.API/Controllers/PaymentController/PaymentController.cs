@@ -56,7 +56,46 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.PaymentController
             return HandleResult(result);
         }
 
-       
+        [Authorize(Roles = "BUYER")]
+        [HttpPost("cancel/{orderId}")]
+        public async Task<IActionResult> CancelOrder(Guid orderId, [FromBody] CancelOrderDTO dto)
+        {
+            if (!TryGetUserId(out var buyerId))
+                return UnauthorizedUser();
+
+            var result = await _paymentService.CancelOrderAsync(buyerId, orderId, dto?.Reason);
+            return HandleResult(result);
+        }
+
+        [Authorize(Roles = "BUYER")]
+        [HttpPost("refund-info/{orderId}")]
+        public async Task<IActionResult> SubmitRefundInfo(Guid orderId, [FromBody] RefundInfoDTO dto)
+        {
+            if (!TryGetUserId(out var buyerId))
+                return UnauthorizedUser();
+
+            var result = await _paymentService.SubmitRefundInfoAsync(buyerId, orderId, dto);
+            return HandleResult(result);
+        }
+
+        [Authorize(Roles = "BUYER")]
+        [HttpGet("refund-status/{orderId}")]
+        public async Task<IActionResult> GetRefundStatus(Guid orderId)
+        {
+            if (!TryGetUserId(out var buyerId))
+                return UnauthorizedUser();
+
+            var result = await _paymentService.GetRefundStatusAsync(buyerId, orderId);
+            return HandleResult(result);
+        }
+
+        [Authorize(Roles = "ADMIN")]
+        [HttpPost("refund-confirm/{orderId}")]
+        public async Task<IActionResult> ConfirmRefund(Guid orderId)
+        {
+            var result = await _paymentService.ConfirmRefundAsync(orderId);
+            return HandleResult(result);
+        }
 
         [AllowAnonymous]
         [HttpGet("/payment-success")]
@@ -108,13 +147,17 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.PaymentController
             if (!data.TryGetProperty("orderCode", out var orderCodeElement))
                 return BadRequest("Thiếu orderCode");
 
-            string orderCode = orderCodeElement.GetString();
+            string orderCode = orderCodeElement.ValueKind switch
+            {
+                JsonValueKind.Number => orderCodeElement.GetInt64().ToString(),
+                JsonValueKind.String => orderCodeElement.GetString() ?? string.Empty,
+                _ => string.Empty
+            };
 
             var result = await _paymentService.HandlePaymentSuccessAsync(orderCode);
 
             return HandleResult(result);
         }
-
 
         private IActionResult HandleResult(ResponseDTO result)
         {
