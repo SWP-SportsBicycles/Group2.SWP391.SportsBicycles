@@ -26,6 +26,15 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
         Task<(bool IsSuccess, string? RawStatus, string? Description, string? Location, DateTime? EventTime, string? ErrorMessage)> TrackOrderAsync(
             string provider,
             string providerOrderCode);
+
+
+        Task<(bool IsSuccess, decimal Fee, string? ErrorMessage)> CalculateFeeAsync(
+    string provider,
+    int fromDistrictId,
+    string fromWardCode,
+    int toDistrictId,
+    string toWardCode,
+    int insuranceValue);
     }
 
 }

@@ -13,21 +13,29 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         private readonly IGenericRepository<Order> _orderRepo;
         private readonly IGenericRepository<OrderItem> _orderItemRepo;
         private readonly IGenericRepository<Bike> _bikeRepo;
+        private readonly IPaymentService _paymentService;
+        private readonly IShippingProviderClient _shippingProviderClient;
         private readonly IUnitOfWork _uow;
 
+
         public BuyerOrderService(
-            IGenericRepository<Order> orderRepo,
-            IGenericRepository<OrderItem> orderItemRepo,
-            IGenericRepository<Bike> bikeRepo,
-            IUnitOfWork uow)
+       IGenericRepository<Order> orderRepo,
+       IGenericRepository<OrderItem> orderItemRepo,
+       IGenericRepository<Bike> bikeRepo,
+       IShippingProviderClient shippingProviderClient,
+       IUnitOfWork uow,
+       IPaymentService paymentService)
         {
             _orderRepo = orderRepo;
             _orderItemRepo = orderItemRepo;
             _bikeRepo = bikeRepo;
+            _shippingProviderClient = shippingProviderClient;
             _uow = uow;
+            _paymentService = paymentService;
         }
 
         // ================= HELPER =================
+
         private static ResponseDTO Success(object? data = null, BusinessCode code = BusinessCode.GET_DATA_SUCCESSFULLY)
             => new()
             {
@@ -45,9 +53,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             };
 
         // ================= CREATE ORDER =================
-        // ================= CREATE ORDER =================
         public async Task<ResponseDTO> CreateOrderAsync(Guid buyerId, CreateOrderDTO dto)
         {
+            if (buyerId == Guid.Empty)
+                return Fail(BusinessCode.AUTH_NOT_FOUND, "Không xác định được người dùng");
+
             if (dto == null)
                 return Fail(BusinessCode.INVALID_INPUT, "Dữ liệu không hợp lệ");
 
@@ -63,12 +73,24 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (string.IsNullOrWhiteSpace(dto.ReceiverAddress))
                 return Fail(BusinessCode.INVALID_DATA, "Thiếu địa chỉ người nhận");
 
+            if (dto.ToDistrictId <= 0 || string.IsNullOrWhiteSpace(dto.ToWardCode))
+                return Fail(BusinessCode.INVALID_DATA, "Thiếu thông tin địa chỉ giao hàng");
+
+            Guid orderId;
+            decimal subTotal;
+            decimal shippingFee;
+            decimal totalAmount;
+            object itemData;
+
             await _uow.BeginTransactionAsync();
 
             try
             {
                 var bike = await _bikeRepo.AsQueryable()
                     .Include(b => b.Listing)
+                        .ThenInclude(l => l.User)
+                            .ThenInclude(u => u.SellerShippingProfiles)
+                    .Include(b => b.Medias)
                     .FirstOrDefaultAsync(b => b.Id == dto.BikeId);
 
                 if (bike == null)
@@ -77,38 +99,81 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 if (bike.Listing == null)
                     return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy listing");
 
-                // ❌ self-buy
                 if (bike.Listing.UserId == buyerId)
                     return Fail(BusinessCode.INVALID_ACTION, "Không thể mua xe của chính mình");
 
                 if (bike.Listing.Status != ListingStatusEnum.Published)
                     return Fail(BusinessCode.INVALID_ACTION, "Listing chưa được publish");
 
-                // 🔥 double order
+                if (bike.Status != BikeStatusEnum.Available)
+                    return Fail(BusinessCode.INVALID_ACTION, "Bike không khả dụng để đặt mua");
+
+                var sellerProfile = bike.Listing.User?.SellerShippingProfiles?
+                    .OrderByDescending(x => x.IsDefault)
+                    .ThenByDescending(x => x.CreatedAt)
+                    .FirstOrDefault();
+
+                if (sellerProfile == null)
+                    return Fail(BusinessCode.DATA_NOT_FOUND, "Seller chưa cấu hình địa chỉ giao hàng");
+
+                var now = DateTime.UtcNow;
+
                 var hasActiveOrder = await _orderRepo.AsQueryable()
                     .AnyAsync(o =>
-                        (o.Status == OrderStatusEnum.Pending ||
-                         o.Status == OrderStatusEnum.Paid ||
-                         o.Status == OrderStatusEnum.Shipping)
-                        && o.OrderItems.Any(oi => oi.BikeId == dto.BikeId)
-                    );
+                        o.OrderItems.Any(oi => oi.BikeId == dto.BikeId) &&
+                        (
+                            (
+                                o.Status == OrderStatusEnum.Locked &&
+                                o.ExpiresAt != null &&
+                                o.ExpiresAt > now
+                            )
+                            ||
+                            o.Status == OrderStatusEnum.Pending ||
+                            o.Status == OrderStatusEnum.Paid ||
+                            o.Status == OrderStatusEnum.Confirmed ||
+                            o.Status == OrderStatusEnum.Shipping
+                        ));
 
                 if (hasActiveOrder)
                     return Fail(BusinessCode.INVALID_ACTION, "Bike đã có người đặt");
 
-                // 🔥 bike status
-                if (bike.Status != BikeStatusEnum.Available)
-                    return Fail(BusinessCode.INVALID_ACTION, "Bike không khả dụng để đặt mua");
+                var price = bike.SalePrice > 0 ? bike.SalePrice : bike.Price;
+
+                subTotal = price;
+
+                var feeResult = await _shippingProviderClient.CalculateFeeAsync(
+     "GHN",
+     sellerProfile.FromDistrictId,
+     sellerProfile.FromWardCode,
+     dto.ToDistrictId,
+     dto.ToWardCode,
+     (int)price
+ );
+
+                if (!feeResult.IsSuccess)
+                    return Fail(BusinessCode.INVALID_ACTION, feeResult.ErrorMessage ?? "Không tính được phí ship GHN");
+
+                shippingFee = feeResult.Fee;
+
+                totalAmount = subTotal + shippingFee;
 
                 var order = new Order
                 {
                     Id = Guid.NewGuid(),
                     UserId = buyerId,
-                    Status = OrderStatusEnum.Pending,
+                    Status = OrderStatusEnum.Locked,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(2),
+
                     ReceiverName = dto.ReceiverName.Trim(),
                     ReceiverPhone = dto.ReceiverPhone.Trim(),
                     ReceiverAddress = dto.ReceiverAddress.Trim(),
-                    TotalAmount = bike.Price
+
+                    ToDistrictId = dto.ToDistrictId,
+                    ToWardCode = dto.ToWardCode.Trim(),
+
+                    SubTotal = subTotal,
+                    ShippingFee = shippingFee,
+                    TotalAmount = totalAmount
                 };
 
                 await _orderRepo.Insert(order);
@@ -118,31 +183,66 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     Id = Guid.NewGuid(),
                     OrderId = order.Id,
                     BikeId = bike.Id,
-                    UnitPrice = bike.Price,
-                    LineTotal = bike.Price
+                    UnitPrice = price,
+                    LineTotal = price
                 };
 
                 await _orderItemRepo.Insert(orderItem);
 
                 bike.Status = BikeStatusEnum.Reserved;
 
-                await _uow.SaveChangeAsync();
-                await _uow.CommitAsync(); // ✅ đúng
+                orderId = order.Id;
 
-                return Success(new
+                itemData = new
                 {
-                    orderId = order.Id,
-                    bikeId = bike.Id,
-                    totalAmount = order.TotalAmount,
-                    status = order.Status.ToString()
-                }, BusinessCode.CREATED_SUCCESSFULLY);
+                    OrderItemId = orderItem.Id,
+                    BikeId = bike.Id,
+                    UnitPrice = price,
+                    LineTotal = price,
+
+                    Bike = new
+                    {
+                        bike.Brand,
+                        bike.Category,
+                        bike.FrameSize,
+                        bike.SalePrice,
+                        Title = bike.Listing.Title,
+                        Thumbnail = bike.Medias
+                            .Where(m => !string.IsNullOrWhiteSpace(m.Image))
+                            .OrderBy(m => m.Type)
+                            .Select(m => m.Image)
+                            .FirstOrDefault() ?? string.Empty
+                    }
+                };
+
+                await _uow.SaveChangeAsync();
+                await _uow.CommitAsync();
             }
             catch
             {
-                await _uow.RollbackAsync(); // 🔥 cực kỳ quan trọng
+                await _uow.RollbackAsync();
                 throw;
             }
-        }        // ================= MARK PAID =================
+
+            var paymentResult = await _paymentService.CreatePaymentLink(buyerId, orderId);
+
+            if (!paymentResult.IsSucess)
+                return paymentResult;
+
+            return Success(new
+            {
+                OrderId = orderId,
+                SubTotal = subTotal,
+                ShippingFee = shippingFee,
+                TotalAmount = totalAmount,
+                Status = OrderStatusEnum.Locked.ToString(),
+                ExpiresAt = DateTime.UtcNow.AddMinutes(2),
+
+                Payment = paymentResult.Data,
+
+                Items = new List<object> { itemData }
+            }, BusinessCode.CREATED_SUCCESSFULLY);
+        }
         public async Task<ResponseDTO> MarkOrderPaidAsync(Guid orderId)
         {
             if (orderId == Guid.Empty)
