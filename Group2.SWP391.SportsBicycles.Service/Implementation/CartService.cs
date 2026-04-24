@@ -15,6 +15,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         private readonly IGenericRepository<Bike> _bikeRepo;
         private readonly IGenericRepository<Order> _orderRepo;
         private readonly IGenericRepository<OrderItem> _orderItemRepo;
+        private readonly IShippingProviderClient _shippingClient;
+
         private readonly IUnitOfWork _uow;
 
         public CartService(
@@ -23,6 +25,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             IGenericRepository<Bike> bikeRepo,
             IGenericRepository<Order> orderRepo,
             IGenericRepository<OrderItem> orderItemRepo,
+                IShippingProviderClient shippingClient,
+
             IUnitOfWork uow)
         {
             _cartRepo = cartRepo;
@@ -30,6 +34,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             _bikeRepo = bikeRepo;
             _orderRepo = orderRepo;
             _orderItemRepo = orderItemRepo;
+            _shippingClient = shippingClient;
             _uow = uow;
         }
 
@@ -51,16 +56,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 Message = msg
             };
 
-        private static decimal CalculateShippingFeeByDistrict(int fromDistrictId, int toDistrictId)
-        {
-            if (fromDistrictId <= 0 || toDistrictId <= 0)
-                return 0;
-
-            if (fromDistrictId == toDistrictId)
-                return 15000;
-
-            return 30000;
-        }
 
         private static string GetThumbnail(Bike bike)
         {
@@ -405,10 +400,19 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             var subTotal = selectedItems.Sum(x => x.UnitPrice);
 
-            var shippingFee = CalculateShippingFeeByDistrict(
-                sellerProfile.FromDistrictId,
-                dto.ToDistrictId
-            );
+            var feeResult = await _shippingClient.CalculateFeeAsync(
+     "GHN",
+     sellerProfile.FromDistrictId,
+     sellerProfile.FromWardCode,
+     dto.ToDistrictId,
+     dto.ToWardCode,
+     (int)subTotal
+ );
+
+            if (!feeResult.IsSuccess)
+                return Fail(BusinessCode.INVALID_ACTION, feeResult.ErrorMessage ?? "Không tính được phí ship GHN");
+
+            var shippingFee = feeResult.Fee;
 
             var totalAmount = subTotal + shippingFee;
 
@@ -583,10 +587,19 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             var subTotal = selectedItems.Sum(x => x.UnitPrice);
 
-            var shippingFee = CalculateShippingFeeByDistrict(
-                sellerProfile.FromDistrictId,
-                dto.ToDistrictId
-            );
+            var feeResult = await _shippingClient.CalculateFeeAsync(
+     "GHN",
+     sellerProfile.FromDistrictId,
+     sellerProfile.FromWardCode,
+     dto.ToDistrictId,
+     dto.ToWardCode,
+     (int)subTotal
+ );
+
+            if (!feeResult.IsSuccess)
+                return Fail(BusinessCode.INVALID_ACTION, feeResult.ErrorMessage ?? "Không tính được phí ship GHN");
+
+            var shippingFee = feeResult.Fee;
 
             var totalAmount = subTotal + shippingFee;
 

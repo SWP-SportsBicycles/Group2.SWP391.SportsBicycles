@@ -283,5 +283,93 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 return (false, null, ex.Message);
             }
         }
+
+        public async Task<(bool IsSuccess, decimal Fee, string? ErrorMessage)> CalculateFeeAsync(
+    string provider,
+    int fromDistrictId,
+    string fromWardCode,
+    int toDistrictId,
+    string toWardCode,
+    int insuranceValue)
+        {
+            try
+            {
+                if (!string.Equals(provider, "GHN", StringComparison.OrdinalIgnoreCase))
+                    return (false, 0, "Provider không được hỗ trợ");
+
+                if (fromDistrictId <= 0)
+                    return (false, 0, "fromDistrictId không hợp lệ");
+
+                if (toDistrictId <= 0)
+                    return (false, 0, "toDistrictId không hợp lệ");
+
+                if (string.IsNullOrWhiteSpace(fromWardCode))
+                    return (false, 0, "fromWardCode không được để trống");
+
+                if (string.IsNullOrWhiteSpace(toWardCode))
+                    return (false, 0, "toWardCode không được để trống");
+
+                var serviceResult = await GetAvailableServiceAsync(fromDistrictId, toDistrictId);
+
+                if (!serviceResult.IsSuccess || serviceResult.ServiceId == null)
+                    return (false, 0, serviceResult.ErrorMessage ?? "Không lấy được service GHN");
+
+                var payload = new
+                {
+                    service_id = serviceResult.ServiceId.Value,
+                    insurance_value = insuranceValue,
+
+                    from_district_id = fromDistrictId,
+                    from_ward_code = fromWardCode,
+
+                    to_district_id = toDistrictId,
+                    to_ward_code = toWardCode,
+
+                    weight = 1000,
+                    length = 30,
+                    width = 20,
+                    height = 10
+                };
+
+                var json = JsonSerializer.Serialize(payload);
+                Console.WriteLine("GHN FEE PAYLOAD: " + json);
+
+                var response = await _httpClient.PostAsync(
+                    "v2/shipping-order/fee",
+                    new StringContent(json, Encoding.UTF8, "application/json"));
+
+                var body = await response.Content.ReadAsStringAsync();
+                Console.WriteLine("GHN FEE RESPONSE: " + body);
+
+                if (!response.IsSuccessStatusCode)
+                    return (false, 0, body);
+
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+
+                var code = root.GetProperty("code").GetInt32();
+
+                if (code != 200)
+                {
+                    var message = root.TryGetProperty("message", out var msg)
+                        ? msg.GetString()
+                        : body;
+
+                    return (false, 0, message);
+                }
+
+                var data = root.GetProperty("data");
+
+                var totalFee = data.TryGetProperty("total", out var total)
+                    ? total.GetDecimal()
+                    : 0;
+
+                return (true, totalFee, null);
+            }
+            catch (Exception ex)
+            {
+                return (false, 0, ex.Message);
+            }
+        }
     }
 }
