@@ -29,12 +29,10 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.InspectorController
             return Ok(result);
         }
 
-        [HttpPut("{reportId:guid}")]
-        public async Task<IActionResult> UpdateReportStatus(
-            Guid reportId,
-            [FromBody] UpdateReportStatusDTO dto)
+        [HttpPut("{reportId:guid}/submit")]
+        public async Task<IActionResult> SubmitToAdmin(Guid reportId)
         {
-            var result = await _service.UpdateReportStatusAsync(reportId, dto);
+            var result = await _service.SubmitReportToAdminAsync(reportId);
             return Ok(result);
         }
     }

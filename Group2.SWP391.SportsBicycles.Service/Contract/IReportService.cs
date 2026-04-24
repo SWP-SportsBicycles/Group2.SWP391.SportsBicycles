@@ -9,11 +9,21 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
 {
     public interface IReportService
     {
+        // BUYER
         Task<ResponseDTO> CreateReportAsync(Guid buyerId, Guid orderId, CreateReportDTO dto);
         Task<ResponseDTO> GetMyReportsAsync(Guid buyerId);
         Task<ResponseDTO> GetReportDetailAsync(Guid buyerId, Guid reportId);
+
+        // INSPECTOR
         Task<ResponseDTO> GetReportsForInspectorAsync(int page, int size, string? status, string? type);
-        Task<ResponseDTO> UpdateReportStatusAsync(Guid reportId, UpdateReportStatusDTO dto);
+        Task<ResponseDTO> SubmitReportToAdminAsync(Guid reportId);
+
+
+        // ADMIN
+        Task<ResponseDTO> GetReportsForAdminAsync(int page, int size, string? status, string? type);
+        Task<ResponseDTO> ApproveReportAsync(Guid reportId);
+        Task<ResponseDTO> RejectReportAsync(Guid reportId);
+
 
     }
 }
