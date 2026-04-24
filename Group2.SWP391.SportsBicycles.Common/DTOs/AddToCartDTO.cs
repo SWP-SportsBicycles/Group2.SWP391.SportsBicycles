@@ -25,7 +25,6 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public int ToDistrictId { get; set; }           // 🔥 thêm
         public string ToWardCode { get; set; } = string.Empty; // 🔥 thêm
 
-        public decimal? DistanceKm { get; set; }        // 🔥 để dùng HasValue / Value
     }
     public class BulkUpdateCartSelectionDTO
     {

@@ -14,6 +14,7 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public decimal Price { get; set; }
         public string Brand { get; set; } = default!;
         public string Category { get; set; } = default!;
+        public string City { get; set; } // 👈 ADD
         public string Thumbnail { get; set; } = string.Empty;
         public string Overall { get; set; } = default!;
         public bool IsWishlisted { get; set; }

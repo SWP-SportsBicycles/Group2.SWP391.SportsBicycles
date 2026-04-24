@@ -122,6 +122,8 @@ public class BuyerListingService : IBuyerListingService
             Price = b.SalePrice,
             Brand = b.Brand,
             Category = b.Category,
+            City = b.City, // 👈 ADD
+
             Thumbnail = GetThumbnail(b),
             Overall = b.Overall,
             IsInspected = b.Inspection != null,
