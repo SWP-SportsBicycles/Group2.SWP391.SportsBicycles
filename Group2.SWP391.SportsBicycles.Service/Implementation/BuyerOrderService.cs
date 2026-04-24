@@ -191,7 +191,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Bike)
                         .ThenInclude(b => b.Listing)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Bike)
+                        .ThenInclude(b => b.Medias)
                 .Include(o => o.Transaction)
+                .Include(o => o.Shipment)
                 .Where(o => o.UserId == buyerId)
                 .OrderByDescending(o => o.CreatedAt);
 
@@ -202,46 +206,112 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 .Take(pageSize)
                 .ToListAsync();
 
-            var items = orders.Select(o =>
+            var items = orders.Select(o => new
             {
-                var firstBike = o.OrderItems.FirstOrDefault()?.Bike;
+                OrderId = o.Id,
+                Status = o.Status.ToString(),
+                TotalAmount = o.TotalAmount,
+                SubTotal = o.SubTotal,
+                ShippingFee = o.ShippingFee,
 
-                return new
+                ReceiverName = o.ReceiverName,
+                ReceiverPhone = o.ReceiverPhone,
+                ReceiverAddress = o.ReceiverAddress,
+                ToDistrictId = o.ToDistrictId,
+                ToWardCode = o.ToWardCode,
+
+                CreatedAt = o.CreatedAt,
+                UpdatedAt = o.UpdatedAt,
+                ExpiresAt = o.ExpiresAt,
+                CompletedAt = o.CompletedAt,
+
+                Payment = o.Transaction == null ? null : new
                 {
-                    OrderId = o.Id,
-                    Status = o.Status.ToString(),
-                    TotalAmount = o.TotalAmount,
-                    ReceiverName = o.ReceiverName,
-                    ReceiverPhone = o.ReceiverPhone,
-                    ReceiverAddress = o.ReceiverAddress,
-                    CreatedAt = o.CreatedAt,
+                    TransactionId = o.Transaction.Id,
+                    TransactionStatus = o.Transaction.Status.ToString(),
+                    PaymentLink = o.Transaction.PaymentLink,
+                    ProviderOrderCode = o.Transaction.ProviderOrderCode,
+                    PaidAt = o.Transaction.PaidAt
+                },
 
-                    Payment = o.Transaction == null ? null : new
-                    {
-                        TransactionId = o.Transaction.Id,
-                        TransactionStatus = o.Transaction.Status.ToString(),
-                        PaymentLink = o.Transaction.PaymentLink,
-                        ProviderOrderCode = o.Transaction.ProviderOrderCode,
-                        PaidAt = o.Transaction.PaidAt
-                    },
+                Shipment = o.Shipment == null ? null : new
+                {
+                    ShipmentId = o.Shipment.Id,
+                    ShipmentCode = o.Shipment.ShipmentCode,
+                    ProviderOrderCode = o.Shipment.ProviderOrderCode,
+                    ShippingProvider = o.Shipment.ShippingProvider,
+                    ShipmentStatus = o.Shipment.Status.ToString(),
+                    ShippingFee = o.Shipment.ShippingFee,
+                    DeliveredAt = o.Shipment.DeliveredAt
+                },
 
-                    Items = o.OrderItems.Select(oi => new
+                Items = o.OrderItems.Select(oi => new
+                {
+                    OrderItemId = oi.Id,
+                    BikeId = oi.BikeId,
+                    UnitPrice = oi.UnitPrice,
+                    LineTotal = oi.LineTotal,
+
+                    Bike = oi.Bike == null ? null : new
                     {
-                        BikeId = oi.BikeId,
-                        UnitPrice = oi.UnitPrice,
-                        LineTotal = oi.LineTotal,
-                        Bike = oi.Bike == null ? null : new
-                        {
-                            Brand = oi.Bike.Brand,
-                            Category = oi.Bike.Category,
-                            FrameSize = oi.Bike.FrameSize,
-                            Overall = oi.Bike.Overall,
-                            Price = oi.Bike.Price,
-                            ListingId = oi.Bike.ListingId,
-                            Title = oi.Bike.Listing?.Title
-                        }
-                    })
-                };
+                        Id = oi.Bike.Id,
+                        ListingId = oi.Bike.ListingId,
+
+                        SerialNumber = oi.Bike.SerialNumber,
+                        Category = oi.Bike.Category,
+                        Brand = oi.Bike.Brand,
+                        FrameSize = oi.Bike.FrameSize,
+                        FrameMaterial = oi.Bike.FrameMaterial,
+                        Condition = oi.Bike.Condition,
+
+                        Paint = oi.Bike.Paint,
+                        Groupset = oi.Bike.Groupset,
+                        Operating = oi.Bike.Operating,
+                        TireRim = oi.Bike.TireRim,
+                        BrakeType = oi.Bike.BrakeType,
+
+                        Overall = oi.Bike.Overall,
+
+                        Price = oi.Bike.Price,
+                        OriginalPrice = oi.Bike.OriginalPrice,
+                        SalePrice = oi.Bike.SalePrice,
+
+                        Status = oi.Bike.Status.ToString(),
+                        City = oi.Bike.City,
+
+                        Title = oi.Bike.Listing == null ? null : oi.Bike.Listing.Title,
+                        Description = oi.Bike.Listing == null ? null : oi.Bike.Listing.Description,
+
+                      Images = oi.Bike.Medias
+    .Where(m => !string.IsNullOrWhiteSpace(m.Image))
+    .Select(m => m.Image)
+    .ToList(),
+
+VideoUrls = oi.Bike.Medias
+    .Where(m => !string.IsNullOrWhiteSpace(m.VideoUrl))
+    .Select(m => m.VideoUrl)
+    .ToList(),
+
+Thumbnail = oi.Bike.Medias
+    .Where(m =>
+        m.Type == MediaType.Thumbnail &&
+        !string.IsNullOrWhiteSpace(m.Image))
+    .Select(m => m.Image)
+    .FirstOrDefault()
+    ?? oi.Bike.Medias
+        .Where(m => !string.IsNullOrWhiteSpace(m.Image))
+        .Select(m => m.Image)
+        .FirstOrDefault(),
+
+Medias = oi.Bike.Medias.Select(m => new
+{
+    MediaId = m.Id,
+    Image = m.Image,
+    VideoUrl = m.VideoUrl,
+    Type = m.Type.ToString()
+}).ToList()
+                    }
+                }).ToList()
             }).ToList();
 
             return Success(new
@@ -253,7 +323,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 PageSize = pageSize
             });
         }
-
         // ================= GET ORDER DETAIL =================
         public async Task<ResponseDTO> GetOrderDetailAsync(Guid buyerId, Guid orderId)
         {
