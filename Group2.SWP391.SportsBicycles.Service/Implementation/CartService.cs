@@ -471,9 +471,20 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                     Items = selectedItems.Select(x => new
                     {
+                        CartItemId = x.Id,
                         BikeId = x.BikeId,
                         UnitPrice = x.UnitPrice,
-                        Thumbnail = GetThumbnail(x.Bike!)
+                        LineTotal = x.UnitPrice,
+
+                        Bike = new
+                        {
+                            x.Bike!.Brand,
+                            x.Bike.Category,
+                            x.Bike.FrameSize,
+                            x.Bike.SalePrice,
+                            Title = x.Bike.Listing?.Title,
+                            Thumbnail = GetThumbnail(x.Bike)
+                        }
                     }).ToList()
                 }, BusinessCode.CREATED_SUCCESSFULLY);
             }
