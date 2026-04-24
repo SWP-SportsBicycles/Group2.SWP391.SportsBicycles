@@ -4,6 +4,7 @@ using Group2.SWP391.SportsBicycles.Services.Contract;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Group2.SWP391.SportsBicycles.Services.Implementation;
 
 namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
 {
@@ -19,10 +20,10 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
             _service = service;
         }
 
-        [HttpPost("{orderId}")]
-        public async Task<IActionResult> CreateShipment(Guid orderId, [FromBody] CreateShipmentDTO dto)
+        [HttpPost("{orderId}/create")]
+        public async Task<IActionResult> CreateShipment([FromRoute] Guid orderId)
         {
-            var result = await _service.CreateShipmentAsync(orderId, dto);
+            var result = await _service.CreateShipmentAsync(orderId);
             return HandleResult(result);
         }
 

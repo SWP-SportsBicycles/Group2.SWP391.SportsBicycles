@@ -9,18 +9,9 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
 {
     public class CreateShipmentDTO
     {
-        public string ShippingProvider { get; set; } = default!;
-
-        public int ToProvinceId { get; set; }
-        public int ToDistrictId { get; set; }
-        public string ToWardCode { get; set; } = default!;
-        public string? ToProvinceName { get; set; }
-        public string? ToDistrictName { get; set; }
-        public string? ToWardName { get; set; }
-
-        public double DistanceKm { get; set; }
+        public string ShippingProvider { get; set; } = "GHN";
+        public decimal CodAmount { get; set; } = 0;
         public string? Note { get; set; }
-        public decimal CodAmount { get; set; }
     }
     public class ShipmentTrackingDTO
     {

@@ -336,5 +336,51 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             return Success(data);
         }
+
+
+        public async Task<ResponseDTO> CancelOrderAsync(Guid buyerId, Guid orderId)
+        {
+            if (buyerId == Guid.Empty)
+                return Fail(BusinessCode.INVALID_INPUT, "BuyerId không hợp lệ");
+
+            if (orderId == Guid.Empty)
+                return Fail(BusinessCode.INVALID_INPUT, "OrderId không hợp lệ");
+
+            var order = await _orderRepo.AsQueryable()
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Bike)
+                .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == buyerId);
+
+            if (order == null)
+                return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy order");
+
+            // 🔥 chỉ cho cancel khi Locked hoặc Pending
+            if (order.Status != OrderStatusEnum.Locked &&
+                order.Status != OrderStatusEnum.Pending)
+            {
+                return Fail(BusinessCode.INVALID_ACTION,
+                    "Chỉ order Locked hoặc Pending mới được hủy");
+            }
+
+            // update status
+            order.Status = OrderStatusEnum.Cancelled;
+
+            // 🔥 release bike
+            foreach (var item in order.OrderItems)
+            {
+                if (item.Bike != null)
+                {
+                    item.Bike.Status = BikeStatusEnum.Available;
+                }
+            }
+
+            await _uow.SaveChangeAsync();
+
+            return Success(new
+            {
+                orderId = order.Id,
+                status = order.Status.ToString()
+            }, BusinessCode.UPDATE_SUCESSFULLY);
+        }
     }
 }
