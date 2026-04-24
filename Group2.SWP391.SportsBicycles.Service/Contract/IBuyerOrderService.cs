@@ -14,5 +14,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
 
         Task<ResponseDTO> GetMyOrdersAsync(Guid buyerId, int pageNumber, int pageSize);
         Task<ResponseDTO> GetOrderDetailAsync(Guid buyerId, Guid orderId);
+
+        Task<ResponseDTO> CancelOrderAsync(Guid buyerId, Guid orderId);
     }
 }

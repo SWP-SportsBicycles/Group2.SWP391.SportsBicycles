@@ -85,6 +85,17 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
             return HandleResult(result);
         }
 
+
+        [HttpPost("{orderId}/cancel")]
+        public async Task<IActionResult> CancelOrder([FromRoute] Guid orderId)
+        {
+            if (!TryGetUserId(out var buyerId))
+                return UnauthorizedUser();
+
+            var result = await _service.CancelOrderAsync(buyerId, orderId);
+
+            return HandleResult(result);
+        }
         private IActionResult HandleResult(ResponseDTO result)
         {
             if (result == null)
