@@ -13,6 +13,9 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
 
         public ReportTypeEnum Type { get; set; }
         public string Reason { get; set; } = default!;
+
+        public string? Description { get; set; } 
+        public string? VideoUrl { get; set; }    
         public ReportStatusEnum Status { get; set; } = ReportStatusEnum.Pending;
 
         public Guid OrderId { get; set; }

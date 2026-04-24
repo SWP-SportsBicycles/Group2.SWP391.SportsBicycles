@@ -279,6 +279,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
 
         // ================= GET MY ORDERS =================
+        // ================= GET MY ORDERS =================
         public async Task<ResponseDTO> GetMyOrdersAsync(Guid buyerId, int pageNumber, int pageSize)
         {
             if (buyerId == Guid.Empty)
@@ -382,34 +383,33 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                         Title = oi.Bike.Listing == null ? null : oi.Bike.Listing.Title,
                         Description = oi.Bike.Listing == null ? null : oi.Bike.Listing.Description,
 
-                      Images = oi.Bike.Medias
-    .Where(m => !string.IsNullOrWhiteSpace(m.Image))
-    .Select(m => m.Image)
-    .ToList(),
+                        Images = oi.Bike.Medias
+                            .Where(m => !string.IsNullOrWhiteSpace(m.Image))
+                            .Select(m => m.Image)
+                            .ToList(),
 
-VideoUrls = oi.Bike.Medias
-    .Where(m => !string.IsNullOrWhiteSpace(m.VideoUrl))
-    .Select(m => m.VideoUrl)
-    .ToList(),
+                        VideoUrls = oi.Bike.Medias
+                            .Where(m => !string.IsNullOrWhiteSpace(m.VideoUrl))
+                            .Select(m => m.VideoUrl)
+                            .ToList(),
 
-Thumbnail = oi.Bike.Medias
-    .Where(m =>
-        m.Type == MediaType.Thumbnail &&
-        !string.IsNullOrWhiteSpace(m.Image))
-    .Select(m => m.Image)
-    .FirstOrDefault()
-    ?? oi.Bike.Medias
-        .Where(m => !string.IsNullOrWhiteSpace(m.Image))
-        .Select(m => m.Image)
-        .FirstOrDefault(),
+                        Thumbnail = oi.Bike.Medias
+                            .Where(m => m.Type == MediaType.Thumbnail && !string.IsNullOrWhiteSpace(m.Image))
+                            .Select(m => m.Image)
+                            .FirstOrDefault()
+                            ?? oi.Bike.Medias
+                                .Where(m => !string.IsNullOrWhiteSpace(m.Image))
+                                .Select(m => m.Image)
+                                .FirstOrDefault()
+                            ?? string.Empty,
 
-Medias = oi.Bike.Medias.Select(m => new
-{
-    MediaId = m.Id,
-    Image = m.Image,
-    VideoUrl = m.VideoUrl,
-    Type = m.Type.ToString()
-}).ToList()
+                        Medias = oi.Bike.Medias.Select(m => new
+                        {
+                            MediaId = m.Id,
+                            Image = m.Image,
+                            VideoUrl = m.VideoUrl,
+                            Type = m.Type.ToString()
+                        }).ToList()
                     }
                 }).ToList()
             }).ToList();
@@ -423,6 +423,7 @@ Medias = oi.Bike.Medias.Select(m => new
                 PageSize = pageSize
             });
         }
+
         // ================= GET ORDER DETAIL =================
         public async Task<ResponseDTO> GetOrderDetailAsync(Guid buyerId, Guid orderId)
         {
@@ -436,6 +437,9 @@ Medias = oi.Bike.Medias.Select(m => new
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Bike)
                         .ThenInclude(b => b.Listing)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Bike)
+                        .ThenInclude(b => b.Medias)
                 .Include(o => o.Transaction)
                 .Include(o => o.Shipment)
                 .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == buyerId);
@@ -448,11 +452,19 @@ Medias = oi.Bike.Medias.Select(m => new
                 OrderId = order.Id,
                 Status = order.Status.ToString(),
                 TotalAmount = order.TotalAmount,
+                SubTotal = order.SubTotal,
+                ShippingFee = order.ShippingFee,
+
                 ReceiverName = order.ReceiverName,
                 ReceiverPhone = order.ReceiverPhone,
                 ReceiverAddress = order.ReceiverAddress,
+                ToDistrictId = order.ToDistrictId,
+                ToWardCode = order.ToWardCode,
+
                 CreatedAt = order.CreatedAt,
                 UpdatedAt = order.UpdatedAt,
+                ExpiresAt = order.ExpiresAt,
+                CompletedAt = order.CompletedAt,
 
                 Payment = order.Transaction == null ? null : new
                 {
@@ -482,30 +494,70 @@ Medias = oi.Bike.Medias.Select(m => new
                     BikeId = oi.BikeId,
                     UnitPrice = oi.UnitPrice,
                     LineTotal = oi.LineTotal,
+
                     Bike = oi.Bike == null ? null : new
                     {
-                        Brand = oi.Bike.Brand,
+                        Id = oi.Bike.Id,
+                        ListingId = oi.Bike.ListingId,
+
+                        SerialNumber = oi.Bike.SerialNumber,
                         Category = oi.Bike.Category,
+                        Brand = oi.Bike.Brand,
                         FrameSize = oi.Bike.FrameSize,
                         FrameMaterial = oi.Bike.FrameMaterial,
                         Condition = oi.Bike.Condition,
+
                         Paint = oi.Bike.Paint,
                         Groupset = oi.Bike.Groupset,
                         Operating = oi.Bike.Operating,
                         TireRim = oi.Bike.TireRim,
                         BrakeType = oi.Bike.BrakeType,
+
                         Overall = oi.Bike.Overall,
+
                         Price = oi.Bike.Price,
-                        ListingId = oi.Bike.ListingId,
-                        Title = oi.Bike.Listing?.Title,
-                        Description = oi.Bike.Listing?.Description
+                        OriginalPrice = oi.Bike.OriginalPrice,
+                        SalePrice = oi.Bike.SalePrice,
+
+                        Status = oi.Bike.Status.ToString(),
+                        City = oi.Bike.City,
+
+                        Title = oi.Bike.Listing == null ? null : oi.Bike.Listing.Title,
+                        Description = oi.Bike.Listing == null ? null : oi.Bike.Listing.Description,
+
+                        Images = oi.Bike.Medias
+                            .Where(m => !string.IsNullOrWhiteSpace(m.Image))
+                            .Select(m => m.Image)
+                            .ToList(),
+
+                        VideoUrls = oi.Bike.Medias
+                            .Where(m => !string.IsNullOrWhiteSpace(m.VideoUrl))
+                            .Select(m => m.VideoUrl)
+                            .ToList(),
+
+                        Thumbnail = oi.Bike.Medias
+                            .Where(m => m.Type == MediaType.Thumbnail && !string.IsNullOrWhiteSpace(m.Image))
+                            .Select(m => m.Image)
+                            .FirstOrDefault()
+                            ?? oi.Bike.Medias
+                                .Where(m => !string.IsNullOrWhiteSpace(m.Image))
+                                .Select(m => m.Image)
+                                .FirstOrDefault()
+                            ?? string.Empty,
+
+                        Medias = oi.Bike.Medias.Select(m => new
+                        {
+                            MediaId = m.Id,
+                            Image = m.Image,
+                            VideoUrl = m.VideoUrl,
+                            Type = m.Type.ToString()
+                        }).ToList()
                     }
-                })
+                }).ToList()
             };
 
             return Success(data);
         }
-
 
         public async Task<ResponseDTO> CancelOrderAsync(Guid buyerId, Guid orderId)
         {

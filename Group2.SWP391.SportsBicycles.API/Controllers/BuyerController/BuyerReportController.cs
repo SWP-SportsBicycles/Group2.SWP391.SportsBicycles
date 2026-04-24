@@ -78,25 +78,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
         }
 
 
-        // ================= GET REPORTS (ADMIN) =================
-        [HttpGet]
-        public async Task<IActionResult> GetReports(
-            [FromQuery] int page = 1,
-            [FromQuery] int size = 10,
-            [FromQuery] string? status = null,
-            [FromQuery] string? type = null)
-        {
-            var result = await _service.GetReportsForAdminAsync(page, size, status, type);
-            return HandleResult(result);
-        }
-
-        // ================= UPDATE REPORT STATUS =================
-        [HttpPut("{reportId:guid}")]
-        public async Task<IActionResult> UpdateReportStatus(Guid reportId, [FromBody] UpdateReportStatusDTO dto)
-        {
-            var result = await _service.UpdateReportStatusAsync(reportId, dto);
-            return HandleResult(result);
-        }
+      
 
         // ================= GET CURRENT USER ID =================
         private Guid GetCurrentUserId()
