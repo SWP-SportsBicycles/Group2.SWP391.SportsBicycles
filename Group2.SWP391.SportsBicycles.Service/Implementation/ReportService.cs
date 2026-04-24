@@ -42,6 +42,19 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 Message = msg
             };
 
+        private static string MapReportType(ReportTypeEnum type)
+        {
+            return type switch
+            {
+                ReportTypeEnum.WrongDescription => "Không đúng mô tả",
+                ReportTypeEnum.ProductDefect => "Hư hỏng / Lỗi sản phẩm",
+                ReportTypeEnum.MissingOrWrongItem => "Thiếu phụ kiện / Sai hàng",
+                ReportTypeEnum.ShippingIssue => "Vấn đề vận chuyển",
+                ReportTypeEnum.Other => "Khác",
+                _ => "Khác"
+            };
+        }
+
         public async Task<ResponseDTO> CreateReportAsync(Guid buyerId, Guid orderId, CreateReportDTO dto)
         {
             if (buyerId == Guid.Empty)
@@ -93,7 +106,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 ReportId = report.Id,
                 report.OrderId,
                 report.UserId,
-                Type = report.Type.ToString(),
+                Type = MapReportType(report.Type),
+                TypeCode = (int)report.Type,
+                TypeKey = report.Type.ToString(),
                 Status = report.Status.ToString(),
                 report.Reason,
                 report.Description,
@@ -116,7 +131,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     ReportId = r.Id,
                     r.OrderId,
                     OrderStatus = r.Order.Status.ToString(),
-                    Type = r.Type.ToString(),
+                    Type = MapReportType(r.Type),
+                    TypeCode = (int)r.Type,
+                    TypeKey = r.Type.ToString(),
                     Status = r.Status.ToString(),
                     r.Reason,
                     r.Description,
@@ -149,7 +166,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 report.OrderId,
                 report.UserId,
                 OrderStatus = report.Order.Status.ToString(),
-                Type = report.Type.ToString(),
+                Type = MapReportType(report.Type),
+                TypeCode = (int)report.Type,
+                TypeKey = report.Type.ToString(),
                 Status = report.Status.ToString(),
                 report.Reason,
                 report.Description,
@@ -193,7 +212,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     r.OrderId,
                     BuyerId = r.UserId,
                     BuyerName = r.User.FullName,
-                    Type = r.Type.ToString(),
+                    Type = MapReportType(r.Type),
+                    TypeCode = (int)r.Type,
+                    TypeKey = r.Type.ToString(),
                     Status = r.Status.ToString(),
                     r.Reason,
                     r.Description,

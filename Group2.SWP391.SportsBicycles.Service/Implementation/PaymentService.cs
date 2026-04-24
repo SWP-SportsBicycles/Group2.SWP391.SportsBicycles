@@ -95,7 +95,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             {
                 await ReleaseOrderAndBikesAsync(order, "Order expired before creating PayOS payment link");
 
-                return Fail(BusinessCode.INVALID_ACTION,
+                return Fail(
+                    BusinessCode.INVALID_ACTION,
                     "Order đã hết thời gian giữ chỗ, vui lòng tạo lại đơn hàng");
             }
 
@@ -228,7 +229,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                 await _uow.SaveChangeAsync();
 
-                return Fail(BusinessCode.INVALID_ACTION,
+                return Fail(
+                    BusinessCode.INVALID_ACTION,
                     "Order đã hết hạn hoặc đã bị hủy, không thể xác nhận thanh toán");
             }
 
@@ -252,7 +254,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                 await _uow.SaveChangeAsync();
 
-                return Fail(BusinessCode.INVALID_ACTION,
+                return Fail(
+                    BusinessCode.INVALID_ACTION,
                     "Order đã hết thời gian giữ chỗ, vui lòng tạo lại đơn hàng");
             }
 
@@ -269,8 +272,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             transaction.Status = TransactionStatusEnum.Paid;
             transaction.PaidAt = DateTime.UtcNow;
 
-            if (order.Status == OrderStatusEnum.Locked || order.Status == OrderStatusEnum.Pending)
+            if (order.Status == OrderStatusEnum.Locked ||
+                order.Status == OrderStatusEnum.Pending)
+            {
                 order.Status = OrderStatusEnum.Paid;
+            }
 
             await _uow.SaveChangeAsync();
 
@@ -293,36 +299,72 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 .Include(o => o.Transaction)
                 .Include(o => o.Shipment)
                 .Include(o => o.RefundInfo)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Bike)
                 .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == buyerId);
 
             if (order == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy order");
 
-            if (order.Transaction == null)
-                return Fail(BusinessCode.DATA_NOT_FOUND, "Không có transaction để hoàn tiền");
-
-            decimal penaltyPercent;
-            decimal shippingLoss;
-
-            switch (order.Status)
+            // 1. Locked/Pending: hủy trước thanh toán, không hoàn tiền, release bike
+            if (order.Status == OrderStatusEnum.Locked ||
+                order.Status == OrderStatusEnum.Pending)
             {
-                case OrderStatusEnum.Paid:
-                    penaltyPercent = 0.05m;
-                    shippingLoss = order.Shipment == null ? 0m : order.ShippingFee;
-                    break;
+                order.Status = OrderStatusEnum.Cancelled;
 
-                case OrderStatusEnum.Delivered:
-                    penaltyPercent = 0.10m;
-                    shippingLoss = order.ShippingFee;
-                    break;
+                if (order.Transaction != null &&
+                    order.Transaction.Status == TransactionStatusEnum.Pending)
+                {
+                    order.Transaction.Status = TransactionStatusEnum.Failed;
+                    order.Transaction.Description =
+                        $"Buyer cancel before payment | Reason: {reason ?? "Không có"}";
+                }
 
-                default:
-                    return Fail(BusinessCode.INVALID_ACTION,
-                        "Chỉ được hủy đơn khi đang ở trạng thái Paid hoặc Delivered");
+                foreach (var item in order.OrderItems)
+                {
+                    if (item.Bike != null &&
+                        item.Bike.Status == BikeStatusEnum.Reserved)
+                    {
+                        item.Bike.Status = BikeStatusEnum.Available;
+                    }
+                }
+
+                await _uow.SaveChangeAsync();
+
+                return Success(new
+                {
+                    orderId = order.Id,
+                    orderStatus = order.Status.ToString(),
+                    transactionStatus = order.Transaction?.Status.ToString(),
+                    penaltyPercent = 0,
+                    penaltyAmount = 0m,
+                    refundAmount = 0m,
+                    message = "Đã hủy đơn trước thanh toán"
+                });
             }
 
+            // 2. Chỉ Paid mới được hủy hoàn tiền, phạt 5%
+            if (order.Status != OrderStatusEnum.Paid)
+            {
+                return Fail(
+                    BusinessCode.INVALID_ACTION,
+                    "Chỉ được hủy hoàn tiền khi đơn đang ở trạng thái Paid");
+            }
+
+            if (order.Transaction == null ||
+                order.Transaction.Status != TransactionStatusEnum.Paid)
+            {
+                return Fail(
+                    BusinessCode.INVALID_ACTION,
+                    "Đơn hàng chưa có giao dịch thanh toán hợp lệ để hoàn tiền");
+            }
+
+            const decimal penaltyPercent = 0.05m;
             var penaltyAmount = order.SubTotal * penaltyPercent;
-            var refundAmount = order.TotalAmount - penaltyAmount - shippingLoss;
+
+            // Bỏ luồng 10%, không xử lý Delivered.
+            // Paid cancel: refund = tổng đã thanh toán - phí phạt 5%.
+            var refundAmount = order.TotalAmount - penaltyAmount;
 
             if (refundAmount < 0)
                 refundAmount = 0;
@@ -330,11 +372,19 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             order.Status = OrderStatusEnum.Cancelled;
             order.Transaction.Status = TransactionStatusEnum.RefundPending;
             order.Transaction.Description =
-                $"Buyer cancel order | Reason: {reason ?? "Không có"} | " +
-                $"PenaltyPercent: {penaltyPercent * 100}% | " +
+                $"Buyer cancel paid order | Reason: {reason ?? "Không có"} | " +
+                $"PenaltyPercent: 5% | " +
                 $"PenaltyAmount: {penaltyAmount} | " +
-                $"ShippingLoss: {shippingLoss} | " +
                 $"RefundAmount: {refundAmount}";
+
+            foreach (var item in order.OrderItems)
+            {
+                if (item.Bike != null &&
+                    item.Bike.Status == BikeStatusEnum.Reserved)
+                {
+                    item.Bike.Status = BikeStatusEnum.Available;
+                }
+            }
 
             if (order.RefundInfo != null)
             {
@@ -352,11 +402,10 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 subTotal = order.SubTotal,
                 shippingFee = order.ShippingFee,
                 totalAmount = order.TotalAmount,
-                penaltyPercent = penaltyPercent * 100,
+                penaltyPercent = 5,
                 penaltyAmount,
-                shippingLoss,
                 refundAmount,
-                message = "Đã hủy đơn, vui lòng cung cấp thông tin tài khoản để hoàn tiền"
+                message = "Đã hủy đơn đã thanh toán. Vui lòng cung cấp thông tin tài khoản để hoàn tiền"
             });
         }
 
@@ -391,17 +440,15 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (order.Status != OrderStatusEnum.Cancelled)
                 return Fail(BusinessCode.INVALID_ACTION, "Order chưa bị hủy");
 
-            if (order.Transaction == null || order.Transaction.Status != TransactionStatusEnum.RefundPending)
+            if (order.Transaction == null ||
+                order.Transaction.Status != TransactionStatusEnum.RefundPending)
+            {
                 return Fail(BusinessCode.INVALID_ACTION, "Order không ở trạng thái chờ hoàn tiền");
+            }
 
-            decimal penaltyPercent = order.Transaction.Description?.Contains("PenaltyPercent: 10") == true ? 0.10m : 0.05m;
-
-            decimal shippingLoss = order.Status == OrderStatusEnum.Cancelled && order.Shipment != null
-                ? order.ShippingFee
-                : 0m;
-
+            const decimal penaltyPercent = 0.05m;
             var penaltyAmount = order.SubTotal * penaltyPercent;
-            var refundAmount = order.TotalAmount - penaltyAmount - shippingLoss;
+            var refundAmount = order.TotalAmount - penaltyAmount;
 
             if (refundAmount < 0)
                 refundAmount = 0;
@@ -437,6 +484,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             {
                 orderId = order.Id,
                 refundAmount,
+                penaltyPercent = 5,
+                penaltyAmount,
                 bankName = dto.BankName,
                 bankAccountNumber = dto.BankAccountNumber,
                 bankAccountName = dto.BankAccountName,
