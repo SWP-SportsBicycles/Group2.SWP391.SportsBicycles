@@ -21,18 +21,14 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
 
         // ================= CREATE REPORT =================
         [HttpPost("{orderId}")]
-        public async Task<IActionResult> CreateReport(Guid orderId, [FromBody] CreateReportDTO dto)
+        public async Task<IActionResult> CreateReport(
+      Guid orderId,
+      [FromForm] CreateReportDTO dto)
         {
             var buyerId = GetCurrentUserId();
+
             if (buyerId == Guid.Empty)
-            {
-                return Unauthorized(new ResponseDTO
-                {
-                    IsSucess = false,
-                    BusinessCode = BusinessCode.AUTH_NOT_FOUND,
-                    Message = "Không xác định được người dùng"
-                });
-            }
+                return Unauthorized();
 
             var result = await _service.CreateReportAsync(buyerId, orderId, dto);
             return HandleResult(result);

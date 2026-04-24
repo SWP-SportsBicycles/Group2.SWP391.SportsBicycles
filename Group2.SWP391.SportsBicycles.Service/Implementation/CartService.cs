@@ -122,7 +122,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                             o.ExpiresAt > now
                         )
                         ||
-                        o.Status == OrderStatusEnum.Pending ||
                         o.Status == OrderStatusEnum.Paid ||
                         o.Status == OrderStatusEnum.Confirmed ||
                         o.Status == OrderStatusEnum.Shipping
@@ -424,8 +423,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 {
                     Id = Guid.NewGuid(),
                     UserId = buyerId,
-                    Status = OrderStatusEnum.Locked,
-                    ExpiresAt = DateTime.UtcNow.AddMinutes(2),
+                    Status = OrderStatusEnum.Pending,
+                    ExpiresAt = null,
 
                     ReceiverName = dto.ReceiverName.Trim(),
                     ReceiverPhone = dto.ReceiverPhone.Trim(),
@@ -453,7 +452,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                     await _orderItemRepo.Insert(orderItem);
 
-                    item.Bike!.Status = BikeStatusEnum.Reserved;
                 }
 
                 foreach (var item in selectedItems)

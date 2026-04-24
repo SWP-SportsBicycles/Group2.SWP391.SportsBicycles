@@ -8,9 +8,9 @@ namespace Group2.SWP391.SportsBicycles.Common.Enums
 {
     public enum ReportStatusEnum
     {
-        Pending = 1,
-        Reviewing = 2,
-        Resolved = 3,
-        Rejected = 4
+        Pending = 1,    // Buyer vừa gửi report
+        Reviewing = 2,  // Inspector đã check, gửi Admin duyệt
+        Resolved = 3,   // Admin chấp thuận khiếu nại
+        Rejected = 4    // Admin từ chối khiếu nại
     }
 }

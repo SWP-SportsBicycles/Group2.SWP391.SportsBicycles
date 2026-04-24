@@ -1,4 +1,5 @@
 ﻿using Group2.SWP391.SportsBicycles.Common.Enums;
+using Microsoft.AspNetCore.Http;
 using System;
 using System.ComponentModel.DataAnnotations;
 
@@ -10,14 +11,14 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public ReportTypeEnum Type { get; set; }
 
         [Required(ErrorMessage = "Lý do report là bắt buộc")]
-        [MaxLength(1000, ErrorMessage = "Lý do report tối đa 1000 ký tự")]
+        [MaxLength(1000)]
         public string Reason { get; set; } = default!;
 
-        [MaxLength(3000, ErrorMessage = "Mô tả chi tiết tối đa 3000 ký tự")]
+        [MaxLength(3000)]
         public string? Description { get; set; }
 
-        [MaxLength(1000, ErrorMessage = "VideoUrl tối đa 1000 ký tự")]
-        public string? VideoUrl { get; set; }
+        // FE gửi file video bằng multipart/form-data
+        public IFormFile? EvidenceVideo { get; set; }
     }
     public class ReportDetailDTO
     {
