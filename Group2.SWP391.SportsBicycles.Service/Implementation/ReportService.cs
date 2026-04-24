@@ -63,11 +63,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (order == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy order");
 
-            // Chỉ sau khi buyer confirm nhận hàng xong mới được report
             if (order.Status != OrderStatusEnum.Completed)
                 return Fail(BusinessCode.INVALID_ACTION, "Chỉ được report sau khi đã xác nhận nhận hàng");
 
-            // Mỗi order chỉ có 1 report đang mở
             var hasOpenReport = order.Reports.Any(r =>
                 r.Status == ReportStatusEnum.Pending ||
                 r.Status == ReportStatusEnum.Reviewing);
@@ -80,6 +78,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 Id = Guid.NewGuid(),
                 Type = dto.Type,
                 Reason = dto.Reason.Trim(),
+                Description = dto.Description?.Trim(),
+                VideoUrl = dto.VideoUrl?.Trim(),
                 Status = ReportStatusEnum.Pending,
                 OrderId = order.Id,
                 UserId = buyerId
@@ -90,11 +90,15 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             return Success(new
             {
-                report.Id,
+                ReportId = report.Id,
                 report.OrderId,
+                report.UserId,
                 Type = report.Type.ToString(),
                 Status = report.Status.ToString(),
-                report.Reason
+                report.Reason,
+                report.Description,
+                report.VideoUrl,
+                report.CreatedAt
             }, BusinessCode.CREATED_SUCCESSFULLY);
         }
 
@@ -109,12 +113,14 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 .OrderByDescending(r => r.CreatedAt)
                 .Select(r => new
                 {
-                    r.Id,
+                    ReportId = r.Id,
                     r.OrderId,
                     OrderStatus = r.Order.Status.ToString(),
                     Type = r.Type.ToString(),
                     Status = r.Status.ToString(),
                     r.Reason,
+                    r.Description,
+                    r.VideoUrl,
                     r.CreatedAt
                 })
                 .ToListAsync();
@@ -139,18 +145,21 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             return Success(new
             {
-                report.Id,
+                ReportId = report.Id,
                 report.OrderId,
+                report.UserId,
                 OrderStatus = report.Order.Status.ToString(),
                 Type = report.Type.ToString(),
                 Status = report.Status.ToString(),
                 report.Reason,
+                report.Description,
+                report.VideoUrl,
                 report.CreatedAt,
                 report.UpdatedAt
             });
         }
 
-        public async Task<ResponseDTO> GetReportsForAdminAsync(int page, int size, string? status, string? type)
+        public async Task<ResponseDTO> GetReportsForInspectorAsync(int page, int size, string? status, string? type)
         {
             if (page <= 0 || size <= 0)
                 return Fail(BusinessCode.INVALID_INPUT, "Thông tin phân trang không hợp lệ");
@@ -180,13 +189,15 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 .Take(size)
                 .Select(r => new
                 {
-                    r.Id,
+                    ReportId = r.Id,
                     r.OrderId,
                     BuyerId = r.UserId,
                     BuyerName = r.User.FullName,
                     Type = r.Type.ToString(),
                     Status = r.Status.ToString(),
                     r.Reason,
+                    r.Description,
+                    r.VideoUrl,
                     r.CreatedAt
                 })
                 .ToListAsync();
@@ -209,6 +220,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 return Fail(BusinessCode.INVALID_INPUT, "Dữ liệu không hợp lệ");
 
             var report = await _reportRepo.GetById(reportId);
+
             if (report == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
 
@@ -219,8 +231,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             return Success(new
             {
-                report.Id,
-                Status = report.Status.ToString()
+                ReportId = report.Id,
+                Status = report.Status.ToString(),
+                report.UpdatedAt
             }, BusinessCode.UPDATE_SUCESSFULLY);
         }
     }
