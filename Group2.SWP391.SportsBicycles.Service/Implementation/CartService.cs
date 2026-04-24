@@ -4,7 +4,6 @@ using Group2.SWP391.SportsBicycles.Common.Enums;
 using Group2.SWP391.SportsBicycles.DAL.Contract;
 using Group2.SWP391.SportsBicycles.DAL.Models;
 using Group2.SWP391.SportsBicycles.Services.Contract;
-using Group2.SWP391.SportsBicycles.Services.Helpers;
 using Microsoft.EntityFrameworkCore;
 
 namespace Group2.SWP391.SportsBicycles.Services.Implementation
@@ -34,16 +33,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             _uow = uow;
         }
 
-        private static decimal CalculateShippingFeeByDistrict(int fromDistrictId, int toDistrictId)
-        {
-            if (fromDistrictId <= 0 || toDistrictId <= 0)
-                return 0;
-
-            if (fromDistrictId == toDistrictId)
-                return 15000;
-
-            return 30000;
-        }
         private static ResponseDTO Success(
             object? data = null,
             BusinessCode code = BusinessCode.GET_DATA_SUCCESSFULLY)
@@ -62,10 +51,95 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 Message = msg
             };
 
+        private static decimal CalculateShippingFeeByDistrict(int fromDistrictId, int toDistrictId)
+        {
+            if (fromDistrictId <= 0 || toDistrictId <= 0)
+                return 0;
+
+            if (fromDistrictId == toDistrictId)
+                return 15000;
+
+            return 30000;
+        }
+
+        private static string GetThumbnail(Bike bike)
+        {
+            return bike.Medias?
+                .Where(m => !string.IsNullOrWhiteSpace(m.Image))
+                .OrderBy(m => m.Type)
+                .Select(m => m.Image!)
+                .FirstOrDefault()
+                ?? string.Empty;
+        }
+
+        private async Task ReleaseExpiredLockedOrdersAsync()
+        {
+            var now = DateTime.UtcNow;
+
+            var expiredOrders = await _orderRepo.AsQueryable()
+                .Include(o => o.Transaction)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Bike)
+                .Where(o =>
+                    o.Status == OrderStatusEnum.Locked &&
+                    o.ExpiresAt != null &&
+                    o.ExpiresAt <= now)
+                .ToListAsync();
+
+            if (!expiredOrders.Any())
+                return;
+
+            foreach (var order in expiredOrders)
+            {
+                order.Status = OrderStatusEnum.Cancelled;
+
+                if (order.Transaction != null &&
+                    order.Transaction.Status == TransactionStatusEnum.Pending)
+                {
+                    order.Transaction.Status = TransactionStatusEnum.Failed;
+                    order.Transaction.Description = "Order expired before payment";
+                }
+
+                foreach (var item in order.OrderItems)
+                {
+                    if (item.Bike != null &&
+                        item.Bike.Status == BikeStatusEnum.Reserved)
+                    {
+                        item.Bike.Status = BikeStatusEnum.Available;
+                    }
+                }
+            }
+
+            await _uow.SaveChangeAsync();
+        }
+
+        private async Task<bool> HasActiveOrderForBikeAsync(Guid bikeId)
+        {
+            var now = DateTime.UtcNow;
+
+            return await _orderRepo.AsQueryable()
+                .AnyAsync(o =>
+                    o.OrderItems.Any(oi => oi.BikeId == bikeId) &&
+                    (
+                        (
+                            o.Status == OrderStatusEnum.Locked &&
+                            o.ExpiresAt != null &&
+                            o.ExpiresAt > now
+                        )
+                        ||
+                        o.Status == OrderStatusEnum.Pending ||
+                        o.Status == OrderStatusEnum.Paid ||
+                        o.Status == OrderStatusEnum.Confirmed ||
+                        o.Status == OrderStatusEnum.Shipping
+                    ));
+        }
+
         public async Task<ResponseDTO> AddToCartAsync(Guid userId, AddToCartDTO dto)
         {
             if (userId == Guid.Empty)
                 return Fail(BusinessCode.AUTH_NOT_FOUND, "Không xác định được người dùng");
+
+            await ReleaseExpiredLockedOrdersAsync();
 
             if (dto == null || dto.BikeId == Guid.Empty)
                 return Fail(BusinessCode.INVALID_INPUT, "BikeId không hợp lệ");
@@ -89,14 +163,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (bike.Status != BikeStatusEnum.Available)
                 return Fail(BusinessCode.INVALID_ACTION, "Bike không khả dụng");
 
-            var hasActiveOrder = await _orderRepo.AsQueryable()
-                .AnyAsync(o =>
-                    (o.Status == OrderStatusEnum.Locked ||
-                     o.Status == OrderStatusEnum.Pending ||
-                     o.Status == OrderStatusEnum.Paid ||
-                     o.Status == OrderStatusEnum.Confirmed ||
-                     o.Status == OrderStatusEnum.Shipping)
-                    && o.OrderItems.Any(oi => oi.BikeId == dto.BikeId));
+            var hasActiveOrder = await HasActiveOrderForBikeAsync(dto.BikeId);
 
             if (hasActiveOrder)
                 return Fail(BusinessCode.INVALID_ACTION, "Bike đã có người đặt");
@@ -174,13 +241,15 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (userId == Guid.Empty)
                 return Fail(BusinessCode.AUTH_NOT_FOUND, "Không xác định được người dùng");
 
+            await ReleaseExpiredLockedOrdersAsync();
+
             var cart = await _cartRepo.AsQueryable()
                 .Include(c => c.CartItems)
                     .ThenInclude(ci => ci.Bike)
                         .ThenInclude(b => b.Listing)
                 .Include(c => c.CartItems)
                     .ThenInclude(ci => ci.Bike)
-                        .ThenInclude(b => b.Medias) // ADD
+                        .ThenInclude(b => b.Medias)
                 .FirstOrDefaultAsync(c => c.UserId == userId);
 
             if (cart == null)
@@ -208,12 +277,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     ci.Bike.FrameSize,
                     ci.Bike.SalePrice,
                     Title = ci.Bike.Listing?.Title,
-
-                    Thumbnail = ci.Bike.Medias
-                        .Where(m => !string.IsNullOrWhiteSpace(m.Image))
-                        .OrderBy(m => m.Type)
-                        .Select(m => m.Image)
-                        .FirstOrDefault() ?? string.Empty
+                    Thumbnail = GetThumbnail(ci.Bike)
                 }
             }).ToList();
 
@@ -228,6 +292,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 Items = items
             });
         }
+
         public async Task<ResponseDTO> RemoveCartItemAsync(Guid userId, Guid cartItemId)
         {
             if (userId == Guid.Empty)
@@ -254,6 +319,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (buyerId == Guid.Empty)
                 return Fail(BusinessCode.AUTH_NOT_FOUND, "Không xác định được người dùng");
 
+            await ReleaseExpiredLockedOrdersAsync();
+
             if (dto == null)
                 return Fail(BusinessCode.INVALID_INPUT, "Dữ liệu không hợp lệ");
 
@@ -269,101 +336,92 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (dto.ToDistrictId <= 0 || string.IsNullOrWhiteSpace(dto.ToWardCode))
                 return Fail(BusinessCode.INVALID_DATA, "Thiếu thông tin địa chỉ giao hàng");
 
+            var cart = await _cartRepo.AsQueryable()
+                .Include(c => c.CartItems)
+                    .ThenInclude(ci => ci.Bike)
+                        .ThenInclude(b => b.Listing)
+                            .ThenInclude(l => l.User)
+                                .ThenInclude(u => u.SellerShippingProfiles)
+                .Include(c => c.CartItems)
+                    .ThenInclude(ci => ci.Bike)
+                        .ThenInclude(b => b.Medias)
+                .FirstOrDefaultAsync(c => c.UserId == buyerId);
+
+            if (cart == null)
+                return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy giỏ hàng");
+
+            var selectedItems = cart.CartItems
+                .Where(x => x.IsSelected)
+                .ToList();
+
+            if (!selectedItems.Any())
+                return Fail(BusinessCode.INVALID_ACTION, "Vui lòng chọn ít nhất 1 sản phẩm để thanh toán");
+
+            foreach (var item in selectedItems)
+            {
+                if (item.Bike == null)
+                    return Fail(BusinessCode.DATA_NOT_FOUND, "Bike không tồn tại");
+
+                if (item.Bike.Listing == null)
+                    return Fail(BusinessCode.DATA_NOT_FOUND, "Listing không tồn tại");
+
+                if (item.Bike.Listing.UserId == buyerId)
+                    return Fail(BusinessCode.INVALID_ACTION, "Không thể mua xe của chính mình");
+
+                if (item.Bike.Listing.Status != ListingStatusEnum.Published)
+                    return Fail(BusinessCode.INVALID_ACTION, "Có sản phẩm chưa được publish");
+
+                if (item.Bike.Status != BikeStatusEnum.Available)
+                    return Fail(BusinessCode.INVALID_ACTION, $"Bike {item.Bike.Id} không còn khả dụng");
+
+                var hasActiveOrder = await HasActiveOrderForBikeAsync(item.BikeId);
+
+                if (hasActiveOrder)
+                    return Fail(BusinessCode.INVALID_ACTION, $"Bike {item.BikeId} đã có người đặt");
+            }
+
+            var sellerIds = selectedItems
+                .Select(x => x.Bike!.Listing!.UserId)
+                .Distinct()
+                .ToList();
+
+            if (sellerIds.Count > 1)
+                return Fail(BusinessCode.INVALID_ACTION, "Chỉ được thanh toán các sản phẩm của cùng một seller trong một đơn hàng");
+
+            var sellerProfile = selectedItems
+                .Select(x => x.Bike!.Listing!.User?.SellerShippingProfiles?
+                    .OrderByDescending(p => p.IsDefault)
+                    .ThenByDescending(p => p.CreatedAt)
+                    .FirstOrDefault())
+                .FirstOrDefault();
+
+            if (sellerProfile == null)
+                return Fail(BusinessCode.DATA_NOT_FOUND, "Seller chưa cấu hình địa chỉ giao hàng");
+
+            foreach (var item in selectedItems)
+            {
+                item.UnitPrice = item.Bike!.SalePrice;
+            }
+
+            var subTotal = selectedItems.Sum(x => x.UnitPrice);
+
+            var shippingFee = CalculateShippingFeeByDistrict(
+                sellerProfile.FromDistrictId,
+                dto.ToDistrictId
+            );
+
+            var totalAmount = subTotal + shippingFee;
+
             await _uow.BeginTransactionAsync();
 
             try
             {
-                var cart = await _cartRepo.AsQueryable()
-                    .Include(c => c.CartItems)
-                        .ThenInclude(ci => ci.Bike)
-                            .ThenInclude(b => b.Listing)
-                                .ThenInclude(l => l.User)
-                                    .ThenInclude(u => u.SellerShippingProfiles)
-                    .Include(c => c.CartItems)
-                        .ThenInclude(ci => ci.Bike)
-                            .ThenInclude(b => b.Medias)
-                    .FirstOrDefaultAsync(c => c.UserId == buyerId);
-
-                if (cart == null)
-                    return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy giỏ hàng");
-
-                var selectedItems = cart.CartItems
-                    .Where(x => x.IsSelected)
-                    .ToList();
-
-                if (!selectedItems.Any())
-                    return Fail(BusinessCode.INVALID_ACTION, "Vui lòng chọn ít nhất 1 sản phẩm để thanh toán");
-
-                foreach (var item in selectedItems)
-                {
-                    if (item.Bike == null)
-                        return Fail(BusinessCode.DATA_NOT_FOUND, "Bike không tồn tại");
-
-                    if (item.Bike.Listing == null)
-                        return Fail(BusinessCode.DATA_NOT_FOUND, "Listing không tồn tại");
-
-                    if (item.Bike.Listing.UserId == buyerId)
-                        return Fail(BusinessCode.INVALID_ACTION, "Không thể mua xe của chính mình");
-
-                    if (item.Bike.Listing.Status != ListingStatusEnum.Published)
-                        return Fail(BusinessCode.INVALID_ACTION, "Có sản phẩm chưa được publish");
-
-                    if (item.Bike.Status != BikeStatusEnum.Available)
-                        return Fail(BusinessCode.INVALID_ACTION, $"Bike {item.Bike.Id} không còn khả dụng");
-
-                    var hasActiveOrder = await _orderRepo.AsQueryable()
-                        .AnyAsync(o =>
-                            (
-                                o.Status == OrderStatusEnum.Locked ||
-                                o.Status == OrderStatusEnum.Pending ||
-                                o.Status == OrderStatusEnum.Paid ||
-                                o.Status == OrderStatusEnum.Confirmed ||
-                                o.Status == OrderStatusEnum.Shipping
-                            )
-                            && o.OrderItems.Any(oi => oi.BikeId == item.BikeId));
-
-                    if (hasActiveOrder)
-                        return Fail(BusinessCode.INVALID_ACTION, $"Bike {item.BikeId} đã có người đặt");
-                }
-
-                var sellerIds = selectedItems
-                    .Select(x => x.Bike!.Listing!.UserId)
-                    .Distinct()
-                    .ToList();
-
-                if (sellerIds.Count > 1)
-                    return Fail(BusinessCode.INVALID_ACTION, "Chỉ được thanh toán các sản phẩm của cùng một seller trong một đơn hàng");
-
-                var sellerProfile = selectedItems
-                    .Select(x => x.Bike!.Listing!.User?.SellerShippingProfiles?
-                        .OrderByDescending(p => p.IsDefault)
-                        .ThenByDescending(p => p.CreatedAt)
-                        .FirstOrDefault())
-                    .FirstOrDefault();
-
-                if (sellerProfile == null)
-                    return Fail(BusinessCode.DATA_NOT_FOUND, "Seller chưa cấu hình địa chỉ giao hàng");
-
-                foreach (var item in selectedItems)
-                {
-                    item.UnitPrice = item.Bike!.SalePrice;
-                }
-
-                var subTotal = selectedItems.Sum(x => x.UnitPrice);
-
-                var shippingFee = CalculateShippingFeeByDistrict(
-                    sellerProfile.FromDistrictId,
-                    dto.ToDistrictId
-                );
-
-                var totalAmount = subTotal + shippingFee;
-
                 var order = new Order
                 {
                     Id = Guid.NewGuid(),
                     UserId = buyerId,
                     Status = OrderStatusEnum.Locked,
-                    ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(2),
 
                     ReceiverName = dto.ReceiverName.Trim(),
                     ReceiverPhone = dto.ReceiverPhone.Trim(),
@@ -415,11 +473,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     {
                         BikeId = x.BikeId,
                         UnitPrice = x.UnitPrice,
-                        Thumbnail = x.Bike!.Medias
-                            .Where(m => !string.IsNullOrWhiteSpace(m.Image))
-                            .OrderBy(m => m.Type)
-                            .Select(m => m.Image)
-                            .FirstOrDefault() ?? string.Empty
+                        Thumbnail = GetThumbnail(x.Bike!)
                     }).ToList()
                 }, BusinessCode.CREATED_SUCCESSFULLY);
             }
@@ -429,10 +483,13 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 throw;
             }
         }
+
         public async Task<ResponseDTO> PreviewCheckoutAsync(Guid userId, PreviewCheckoutDTO dto)
         {
             if (userId == Guid.Empty)
                 return Fail(BusinessCode.AUTH_NOT_FOUND, "Không xác định được người dùng");
+
+            await ReleaseExpiredLockedOrdersAsync();
 
             if (dto == null)
                 return Fail(BusinessCode.INVALID_INPUT, "Dữ liệu không hợp lệ");
@@ -453,6 +510,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 .Include(c => c.CartItems)
                     .ThenInclude(ci => ci.Bike)
                         .ThenInclude(b => b.Listing)
+                            .ThenInclude(l => l.User)
+                                .ThenInclude(u => u.SellerShippingProfiles)
+                .Include(c => c.CartItems)
+                    .ThenInclude(ci => ci.Bike)
+                        .ThenInclude(b => b.Medias)
                 .FirstOrDefaultAsync(c => c.UserId == userId);
 
             if (cart == null)
@@ -479,28 +541,42 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 if (item.Bike.Status != BikeStatusEnum.Available)
                     return Fail(BusinessCode.INVALID_ACTION, $"Bike {item.Bike.Id} không còn khả dụng");
 
-                var hasActiveOrder = await _orderRepo.AsQueryable()
-                    .AnyAsync(o =>
-                        (o.Status == OrderStatusEnum.Locked ||
-                         o.Status == OrderStatusEnum.Pending ||
-                         o.Status == OrderStatusEnum.Paid ||
-                         o.Status == OrderStatusEnum.Confirmed ||
-                         o.Status == OrderStatusEnum.Shipping)
-                        && o.OrderItems.Any(oi => oi.BikeId == item.BikeId));
+                var hasActiveOrder = await HasActiveOrderForBikeAsync(item.BikeId);
 
                 if (hasActiveOrder)
                     return Fail(BusinessCode.INVALID_ACTION, $"Bike {item.BikeId} đã có người đặt");
             }
 
+            var sellerIds = selectedItems
+                .Select(x => x.Bike!.Listing!.UserId)
+                .Distinct()
+                .ToList();
+
+            if (sellerIds.Count > 1)
+                return Fail(BusinessCode.INVALID_ACTION, "Chỉ được thanh toán các sản phẩm của cùng một seller trong một đơn hàng");
+
+            var sellerProfile = selectedItems
+                .Select(x => x.Bike!.Listing!.User?.SellerShippingProfiles?
+                    .OrderByDescending(p => p.IsDefault)
+                    .ThenByDescending(p => p.CreatedAt)
+                    .FirstOrDefault())
+                .FirstOrDefault();
+
+            if (sellerProfile == null)
+                return Fail(BusinessCode.DATA_NOT_FOUND, "Seller chưa cấu hình địa chỉ giao hàng");
+
             foreach (var item in selectedItems)
             {
-                if (item.Bike == null)
-                    return Fail(BusinessCode.DATA_NOT_FOUND, "Bike không tồn tại");
-
-                item.UnitPrice = item.Bike.SalePrice;
+                item.UnitPrice = item.Bike!.SalePrice;
             }
+
             var subTotal = selectedItems.Sum(x => x.UnitPrice);
-            var shippingFee = ShippingFeeCalculator.Calculate(dto.DistanceKm);
+
+            var shippingFee = CalculateShippingFeeByDistrict(
+                sellerProfile.FromDistrictId,
+                dto.ToDistrictId
+            );
+
             var totalAmount = subTotal + shippingFee;
 
             return Success(new
@@ -510,7 +586,13 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 ReceiverAddress = dto.ReceiverAddress.Trim(),
                 SubTotal = subTotal,
                 ShippingFee = shippingFee,
-                TotalAmount = totalAmount
+                TotalAmount = totalAmount,
+                Items = selectedItems.Select(x => new
+                {
+                    BikeId = x.BikeId,
+                    UnitPrice = x.UnitPrice,
+                    Thumbnail = GetThumbnail(x.Bike!)
+                }).ToList()
             });
         }
     }

@@ -33,6 +33,45 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             _shipmentService = shipmentService;
         }
 
+        private static ResponseDTO Success(object? data = null)
+            => new()
+            {
+                IsSucess = true,
+                BusinessCode = BusinessCode.CREATED_SUCCESSFULLY,
+                Data = data
+            };
+
+        private static ResponseDTO Fail(BusinessCode code, string msg)
+            => new()
+            {
+                IsSucess = false,
+                BusinessCode = code,
+                Message = msg
+            };
+
+        private async Task ReleaseOrderAndBikesAsync(Order order, string reason)
+        {
+            order.Status = OrderStatusEnum.Cancelled;
+
+            if (order.Transaction != null &&
+                order.Transaction.Status == TransactionStatusEnum.Pending)
+            {
+                order.Transaction.Status = TransactionStatusEnum.Failed;
+                order.Transaction.Description = reason;
+            }
+
+            foreach (var item in order.OrderItems)
+            {
+                if (item.Bike != null &&
+                    item.Bike.Status == BikeStatusEnum.Reserved)
+                {
+                    item.Bike.Status = BikeStatusEnum.Available;
+                }
+            }
+
+            await _uow.SaveChangeAsync();
+        }
+
         public async Task<ResponseDTO> CreatePaymentLink(Guid buyerId, Guid orderId)
         {
             if (buyerId == Guid.Empty)
@@ -43,10 +82,22 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             var order = await _orderRepo.AsQueryable()
                 .Include(o => o.Transaction)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Bike)
                 .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == buyerId);
 
             if (order == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Order không tồn tại hoặc không thuộc về bạn");
+
+            if (order.Status == OrderStatusEnum.Locked &&
+                order.ExpiresAt != null &&
+                order.ExpiresAt <= DateTime.UtcNow)
+            {
+                await ReleaseOrderAndBikesAsync(order, "Order expired before creating PayOS payment link");
+
+                return Fail(BusinessCode.INVALID_ACTION,
+                    "Order đã hết thời gian giữ chỗ, vui lòng tạo lại đơn hàng");
+            }
 
             if (order.Status == OrderStatusEnum.Paid)
                 return Fail(BusinessCode.INVALID_ACTION, "Order đã thanh toán");
@@ -160,6 +211,50 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy order");
 
             var order = transaction.Order;
+
+            if (order.Status == OrderStatusEnum.Cancelled)
+            {
+                transaction.Status = TransactionStatusEnum.Failed;
+                transaction.Description = "Thanh toán bị từ chối vì order đã bị hủy hoặc hết hạn";
+
+                foreach (var item in order.OrderItems)
+                {
+                    if (item.Bike != null &&
+                        item.Bike.Status == BikeStatusEnum.Reserved)
+                    {
+                        item.Bike.Status = BikeStatusEnum.Available;
+                    }
+                }
+
+                await _uow.SaveChangeAsync();
+
+                return Fail(BusinessCode.INVALID_ACTION,
+                    "Order đã hết hạn hoặc đã bị hủy, không thể xác nhận thanh toán");
+            }
+
+            if (order.Status == OrderStatusEnum.Locked &&
+                order.ExpiresAt != null &&
+                order.ExpiresAt <= DateTime.UtcNow)
+            {
+                transaction.Status = TransactionStatusEnum.Failed;
+                transaction.Description = "Thanh toán bị từ chối vì order đã hết hạn";
+
+                order.Status = OrderStatusEnum.Cancelled;
+
+                foreach (var item in order.OrderItems)
+                {
+                    if (item.Bike != null &&
+                        item.Bike.Status == BikeStatusEnum.Reserved)
+                    {
+                        item.Bike.Status = BikeStatusEnum.Available;
+                    }
+                }
+
+                await _uow.SaveChangeAsync();
+
+                return Fail(BusinessCode.INVALID_ACTION,
+                    "Order đã hết thời gian giữ chỗ, vui lòng tạo lại đơn hàng");
+            }
 
             if (order.Status == OrderStatusEnum.Paid)
             {
@@ -300,6 +395,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 return Fail(BusinessCode.INVALID_ACTION, "Order không ở trạng thái chờ hoàn tiền");
 
             decimal penaltyPercent = order.Transaction.Description?.Contains("PenaltyPercent: 10") == true ? 0.10m : 0.05m;
+
             decimal shippingLoss = order.Status == OrderStatusEnum.Cancelled && order.Shipment != null
                 ? order.ShippingFee
                 : 0m;
@@ -428,21 +524,5 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 message = "Đã xác nhận hoàn tiền"
             });
         }
-
-        private static ResponseDTO Success(object? data = null)
-            => new()
-            {
-                IsSucess = true,
-                BusinessCode = BusinessCode.CREATED_SUCCESSFULLY,
-                Data = data
-            };
-
-        private static ResponseDTO Fail(BusinessCode code, string msg)
-            => new()
-            {
-                IsSucess = false,
-                BusinessCode = code,
-                Message = msg
-            };
     }
 }
