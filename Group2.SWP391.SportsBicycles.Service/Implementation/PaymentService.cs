@@ -89,31 +89,33 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (order == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Order không tồn tại hoặc không thuộc về bạn");
 
-            if (order.Status == OrderStatusEnum.Locked &&
-                order.ExpiresAt != null &&
-                order.ExpiresAt <= DateTime.UtcNow)
-            {
-                await ReleaseOrderAndBikesAsync(order, "Order expired before creating PayOS payment link");
+            // ❌ bỏ Locked + expired
 
-                return Fail(
-                    BusinessCode.INVALID_ACTION,
-                    "Order đã hết thời gian giữ chỗ, vui lòng tạo lại đơn hàng");
-            }
-
+            // ✅ nếu order đã Paid → không cho tạo nữa
             if (order.Status == OrderStatusEnum.Paid)
                 return Fail(BusinessCode.INVALID_ACTION, "Order đã thanh toán");
 
-            if (order.Status != OrderStatusEnum.Pending &&
-                order.Status != OrderStatusEnum.Locked)
+            // ✅ chỉ cho Pending
+            if (order.Status != OrderStatusEnum.Pending)
             {
                 return Fail(BusinessCode.INVALID_ACTION, "Order không hợp lệ để tạo thanh toán");
             }
 
             if (order.Transaction != null)
             {
+                // ✅ người trước đã thanh toán → chặn
                 if (order.Transaction.Status == TransactionStatusEnum.Paid)
-                    return Fail(BusinessCode.INVALID_ACTION, "Đơn hàng đã được thanh toán");
+                {
+                    return Success(new
+                    {
+                        paymentUrl = (string?)null,
+                        reused = false,
+                        message = "Đơn hàng đã được thanh toán rồi",
+                        orderStatus = order.Status.ToString()
+                    });
+                }
 
+                // ✅ đã có link → reuse
                 if (order.Transaction.Status == TransactionStatusEnum.Pending &&
                     !string.IsNullOrWhiteSpace(order.Transaction.PaymentLink))
                 {
@@ -121,28 +123,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     {
                         paymentUrl = order.Transaction.PaymentLink,
                         reused = true,
-                        orderStatus = order.Status.ToString(),
-                        expiresAt = order.ExpiresAt
+                        orderStatus = order.Status.ToString()
                     });
                 }
-            }
-
-            // KHÓA XE 2 PHÚT KHI TẠO LINK PAYOS
-            if (order.Status == OrderStatusEnum.Pending)
-            {
-                foreach (var item in order.OrderItems)
-                {
-                    if (item.Bike == null)
-                        return Fail(BusinessCode.DATA_NOT_FOUND, "Bike không tồn tại");
-
-                    if (item.Bike.Status != BikeStatusEnum.Available)
-                        return Fail(BusinessCode.INVALID_ACTION, $"Bike {item.Bike.Id} không còn khả dụng");
-
-                    item.Bike.Status = BikeStatusEnum.Reserved;
-                }
-
-                order.Status = OrderStatusEnum.Locked;
-                order.ExpiresAt = DateTime.UtcNow.AddMinutes(2);
             }
 
             var internalOrderCode = $"ORD-{DateTime.UtcNow.Ticks}";
@@ -173,8 +156,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             {
                 paymentUrl = paymentLink,
                 reused = false,
-                orderStatus = order.Status.ToString(),
-                expiresAt = order.ExpiresAt
+                orderStatus = order.Status.ToString()
             });
         }
         public async Task<ResponseDTO> HandlePaymentSuccessAsync(string providerOrderCode)
