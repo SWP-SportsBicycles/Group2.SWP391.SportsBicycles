@@ -89,21 +89,27 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (order == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Order không tồn tại hoặc không thuộc về bạn");
 
-            // ❌ bỏ Locked + expired
-
-            // ✅ nếu order đã Paid → không cho tạo nữa
+            // ❌ đã thanh toán
             if (order.Status == OrderStatusEnum.Paid)
                 return Fail(BusinessCode.INVALID_ACTION, "Order đã thanh toán");
 
-            // ✅ chỉ cho Pending
-            if (order.Status != OrderStatusEnum.Pending)
+            // ❌ đã hủy / hoàn tất
+            if (order.Status == OrderStatusEnum.Cancelled ||
+                order.Status == OrderStatusEnum.Completed)
+            {
+                return Fail(BusinessCode.INVALID_ACTION, "Order không thể thanh toán lại");
+            }
+
+            // ✅ chỉ cho Pending + Locked
+            if (order.Status != OrderStatusEnum.Pending &&
+                order.Status != OrderStatusEnum.Locked)
             {
                 return Fail(BusinessCode.INVALID_ACTION, "Order không hợp lệ để tạo thanh toán");
             }
 
             if (order.Transaction != null)
             {
-                // ✅ người trước đã thanh toán → chặn
+                // ✅ đã thanh toán rồi
                 if (order.Transaction.Status == TransactionStatusEnum.Paid)
                 {
                     return Success(new
@@ -115,7 +121,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     });
                 }
 
-                // ✅ đã có link → reuse
+                // ✅ reuse link cũ
                 if (order.Transaction.Status == TransactionStatusEnum.Pending &&
                     !string.IsNullOrWhiteSpace(order.Transaction.PaymentLink))
                 {
@@ -126,6 +132,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                         orderStatus = order.Status.ToString()
                     });
                 }
+
+                // ❗ nếu Failed/Expired → cho tạo mới
             }
 
             var internalOrderCode = $"ORD-{DateTime.UtcNow.Ticks}";
