@@ -126,6 +126,26 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (hasOpenReport)
                 return Fail(BusinessCode.INVALID_ACTION, "Order đã có report đang được xử lý");
 
+            // ================== VALIDATE BANK ==================
+            bool hasAnyBankInput =
+                !string.IsNullOrWhiteSpace(dto.BankName) ||
+                !string.IsNullOrWhiteSpace(dto.BankAccountNumber) ||
+                !string.IsNullOrWhiteSpace(dto.BankAccountName);
+
+            bool hasFullBankInput =
+                !string.IsNullOrWhiteSpace(dto.BankName) &&
+                !string.IsNullOrWhiteSpace(dto.BankAccountNumber) &&
+                !string.IsNullOrWhiteSpace(dto.BankAccountName);
+
+            if (hasAnyBankInput && !hasFullBankInput)
+            {
+                return Fail(
+                    BusinessCode.INVALID_DATA,
+                    "Vui lòng nhập đầy đủ: tên ngân hàng, số tài khoản, tên chủ tài khoản"
+                );
+            }
+
+            // ================== VIDEO ==================
             string? videoUrl = null;
 
             if (dto.EvidenceVideo != null)
@@ -148,6 +168,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 videoUrl = await _cloud.UploadVideoAsync(dto.EvidenceVideo, $"reports/{orderId}");
             }
 
+            // ================== CREATE REPORT ==================
             var report = new Report
             {
                 Id = Guid.NewGuid(),
@@ -162,10 +183,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             await _reportRepo.Insert(report);
 
-            // 🔥 LƯU BANK NGAY KHI REPORT (nếu có)
-            if (!string.IsNullOrWhiteSpace(dto.BankName) &&
-                !string.IsNullOrWhiteSpace(dto.BankAccountNumber) &&
-                !string.IsNullOrWhiteSpace(dto.BankAccountName))
+            // ================== SAVE BANK ==================
+            if (hasFullBankInput)
             {
                 if (order.RefundInfo == null)
                 {
@@ -177,7 +196,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                         BankName = dto.BankName.Trim(),
                         BankAccountNumber = dto.BankAccountNumber.Trim(),
                         BankAccountName = dto.BankAccountName.Trim(),
-                        RefundAmount = order.TotalAmount // có thể tính lại ở bước approve
+                        RefundAmount = order.TotalAmount
                     };
 
                     await _refundInfoRepo.Insert(refund);
@@ -204,8 +223,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 report.Description,
                 report.VideoUrl,
                 report.CreatedAt,
-                hasBankInfo =
-                    !string.IsNullOrWhiteSpace(dto.BankAccountNumber)
+                hasBankInfo = hasFullBankInput
             }, BusinessCode.CREATED_SUCCESSFULLY);
         }
         public async Task<ResponseDTO> GetMyReportsAsync(Guid buyerId)
