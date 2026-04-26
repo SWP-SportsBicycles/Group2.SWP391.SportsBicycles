@@ -97,25 +97,25 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.PaymentController
             return HandleResult(result);
         }
 
-        [AllowAnonymous]
-        [HttpGet("/payment-success")]
-        public IActionResult PaymentSuccess(
-            [FromQuery] string? code,
-            [FromQuery] string? id,
-            [FromQuery] bool? cancel,
-            [FromQuery] string? status,
-            [FromQuery] long? orderCode)
-        {
-            return Ok(new
-            {
-                message = "Thanh toán thành công",
-                code,
-                id,
-                cancel,
-                status,
-                orderCode
-            });
-        }
+        //[AllowAnonymous]
+        //[HttpGet("/payment-success")]
+        //public IActionResult PaymentSuccess(
+        //    [FromQuery] string? code,
+        //    [FromQuery] string? id,
+        //    [FromQuery] bool? cancel,
+        //    [FromQuery] string? status,
+        //    [FromQuery] long? orderCode)
+        //{
+        //    return Ok(new
+        //    {
+        //        message = "Thanh toán thành công",
+        //        code,
+        //        id,
+        //        cancel,
+        //        status,
+        //        orderCode
+        //    });
+        //}
 
 
 
