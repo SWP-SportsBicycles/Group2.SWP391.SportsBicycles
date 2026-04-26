@@ -44,6 +44,13 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
             var result = await _service.GetMyReviewsAsync(GetUserId());
             return StatusCode(result.IsSucess ? 200 : 400, result);
         }
+        [Authorize(Roles = nameof(RoleEnum.BUYER))]
+        [HttpGet("my-reviewed-orders")]
+        public async Task<IActionResult> GetMyReviewedOrders()
+        {
+            var result = await _service.GetMyReviewedOrdersAsync(GetUserId());
+            return StatusCode(result.IsSucess ? 200 : 400, result);
+        }
 
     }
 }

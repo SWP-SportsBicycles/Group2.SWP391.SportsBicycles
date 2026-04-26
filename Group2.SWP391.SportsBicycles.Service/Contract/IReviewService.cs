@@ -11,6 +11,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
     {
         Task<ResponseDTO> CreateReviewAsync(Guid userId, CreateReviewDTO dto);
         Task<ResponseDTO> GetMyReviewsAsync(Guid sellerId);
+        Task<ResponseDTO> GetMyReviewedOrdersAsync(Guid buyerId);
 
     }
 }

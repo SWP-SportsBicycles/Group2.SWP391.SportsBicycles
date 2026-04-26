@@ -164,6 +164,66 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             return res;
         }
 
+        public async Task<ResponseDTO> GetMyReviewedOrdersAsync(Guid buyerId)
+        {
+            ResponseDTO res = new ResponseDTO();
+
+            try
+            {
+                if (buyerId == Guid.Empty)
+                {
+                    res.IsSucess = false;
+                    res.BusinessCode = BusinessCode.AUTH_NOT_FOUND;
+                    res.Message = "Không xác định user";
+                    return res;
+                }
+
+                var data = await _reviewRepo.AsQueryable()
+                    .Include(r => r.Order)
+                        .ThenInclude(o => o.OrderItems)
+                            .ThenInclude(oi => oi.Bike)
+                                .ThenInclude(b => b.Listing)
+                    .Include(r => r.Order)
+                        .ThenInclude(o => o.User)
+                    .Where(r => r.Order.UserId == buyerId)
+                    .OrderByDescending(r => r.CreatedAt)
+                    .Select(r => new
+                    {
+                        ReviewId = r.Id,
+                        r.Rating,
+                        r.Comment,
+                        r.CreatedAt,
+
+                        OrderId = r.OrderId,
+
+                        BikeName = r.Order.OrderItems
+                            .Select(oi => oi.Bike.Brand + " " + oi.Bike.Category)
+                            .FirstOrDefault(),
+
+                        SellerId = r.Order.OrderItems
+                            .Select(oi => oi.Bike.Listing.UserId)
+                            .FirstOrDefault(),
+
+                        SellerName = r.Order.OrderItems
+                            .Select(oi => oi.Bike.Listing.User.FullName)
+                            .FirstOrDefault()
+                    })
+                    .ToListAsync();
+
+                res.IsSucess = true;
+                res.BusinessCode = BusinessCode.GET_DATA_SUCCESSFULLY;
+                res.Data = data;
+            }
+            catch (Exception ex)
+            {
+                res.IsSucess = false;
+                res.BusinessCode = BusinessCode.EXCEPTION;
+                res.Message = ex.Message;
+            }
+
+            return res;
+        }
+
         public async Task<ResponseDTO> GetMyReviewsAsync(Guid sellerId)
         {
             ResponseDTO res = new ResponseDTO();
