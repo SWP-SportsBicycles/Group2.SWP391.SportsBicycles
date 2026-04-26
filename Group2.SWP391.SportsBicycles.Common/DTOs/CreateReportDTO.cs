@@ -19,6 +19,12 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
 
         // FE gửi file video bằng multipart/form-data
         public IFormFile? EvidenceVideo { get; set; }
+
+
+        // 🔥 thêm bank
+        public string? BankName { get; set; }
+        public string? BankAccountNumber { get; set; }
+        public string? BankAccountName { get; set; }
     }
     public class ReportDetailDTO
     {

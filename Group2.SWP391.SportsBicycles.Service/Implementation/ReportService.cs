@@ -16,9 +16,18 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         private readonly ICloudinaryService _cloud;
         private readonly IUnitOfWork _uow;
         private readonly IGenericRepository<User> _userRepo;
+        private readonly IGenericRepository<RefundInfo> _refundInfoRepo;
         private readonly IEmailService _emailService;
 
-        public ReportService(IGenericRepository<Report> reportRepo, IGenericRepository<Order> orderRepo, ICloudinaryService cloud, IUnitOfWork uow, IGenericRepository<User> userRepo, IEmailService emailService)
+        public ReportService(
+        IGenericRepository<Report> reportRepo,
+        IGenericRepository<Order> orderRepo,
+        ICloudinaryService cloud,
+        IUnitOfWork uow,
+        IGenericRepository<User> userRepo,
+        IEmailService emailService,
+        IGenericRepository<RefundInfo> refundInfoRepo 
+    )
         {
             _reportRepo = reportRepo;
             _orderRepo = orderRepo;
@@ -26,6 +35,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             _uow = uow;
             _userRepo = userRepo;
             _emailService = emailService;
+            _refundInfoRepo = refundInfoRepo; 
         }
 
         private static ResponseDTO Success(
@@ -99,6 +109,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             var order = await _orderRepo.AsQueryable()
                 .Include(o => o.Reports)
+                .Include(o => o.Transaction)
+                .Include(o => o.RefundInfo)
                 .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == buyerId);
 
             if (order == null)
@@ -149,6 +161,36 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             };
 
             await _reportRepo.Insert(report);
+
+            // 🔥 LƯU BANK NGAY KHI REPORT (nếu có)
+            if (!string.IsNullOrWhiteSpace(dto.BankName) &&
+                !string.IsNullOrWhiteSpace(dto.BankAccountNumber) &&
+                !string.IsNullOrWhiteSpace(dto.BankAccountName))
+            {
+                if (order.RefundInfo == null)
+                {
+                    var refund = new RefundInfo
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = order.Id,
+                        UserId = buyerId,
+                        BankName = dto.BankName.Trim(),
+                        BankAccountNumber = dto.BankAccountNumber.Trim(),
+                        BankAccountName = dto.BankAccountName.Trim(),
+                        RefundAmount = order.TotalAmount // có thể tính lại ở bước approve
+                    };
+
+                    await _refundInfoRepo.Insert(refund);
+                }
+                else
+                {
+                    order.RefundInfo.BankName = dto.BankName.Trim();
+                    order.RefundInfo.BankAccountNumber = dto.BankAccountNumber.Trim();
+                    order.RefundInfo.BankAccountName = dto.BankAccountName.Trim();
+                    order.RefundInfo.RefundAmount = order.TotalAmount;
+                }
+            }
+
             await _uow.SaveChangeAsync();
 
             return Success(new
@@ -156,19 +198,16 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 ReportId = report.Id,
                 report.OrderId,
                 report.UserId,
-                Type = MapReportType(report.Type),
-                TypeCode = (int)report.Type,
-                TypeKey = report.Type.ToString(),
+                Type = report.Type.ToString(),
                 Status = report.Status.ToString(),
-                StatusDisplay = MapReportStatusDisplay(report.Status),
-                NextAction = MapReportNextAction(report.Status),
                 report.Reason,
                 report.Description,
                 report.VideoUrl,
-                report.CreatedAt
+                report.CreatedAt,
+                hasBankInfo =
+                    !string.IsNullOrWhiteSpace(dto.BankAccountNumber)
             }, BusinessCode.CREATED_SUCCESSFULLY);
         }
-
         public async Task<ResponseDTO> GetMyReportsAsync(Guid buyerId)
         {
             if (buyerId == Guid.Empty)
@@ -176,30 +215,52 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             var reports = await _reportRepo.AsQueryable()
                 .Include(r => r.Order)
+                    .ThenInclude(o => o.Transaction)
+                .Include(r => r.Order)
+                    .ThenInclude(o => o.RefundInfo)
                 .Where(r => r.UserId == buyerId)
                 .OrderByDescending(r => r.CreatedAt)
                 .Select(r => new
                 {
                     ReportId = r.Id,
                     r.OrderId,
+
+                    // ===== BASIC =====
                     OrderStatus = r.Order.Status.ToString(),
                     Type = MapReportType(r.Type),
-                    TypeCode = (int)r.Type,
-                    TypeKey = r.Type.ToString(),
                     Status = r.Status.ToString(),
                     StatusDisplay = MapReportStatusDisplay(r.Status),
                     NextAction = MapReportNextAction(r.Status),
+
                     r.Reason,
                     r.Description,
                     r.VideoUrl,
                     r.CreatedAt,
-                    r.UpdatedAt
+
+                    // ===== REFUND =====
+                    transactionStatus = r.Order.Transaction == null
+                        ? null
+                        : r.Order.Transaction.Status.ToString(),
+
+                    refundStatus =
+                        r.Order.Transaction == null
+                            ? "Không có hoàn tiền"
+                            : r.Order.Transaction.Status == TransactionStatusEnum.RefundPending
+                                ? "Đang chờ hoàn tiền"
+                                : r.Order.Transaction.Status == TransactionStatusEnum.Refunded
+                                    ? "Đã hoàn tiền"
+                                    : "Không có hoàn tiền",
+
+                    refundAmount = r.Order.RefundInfo != null
+                        ? r.Order.RefundInfo.RefundAmount
+                        : 0,
+
+                    hasBankInfo = r.Order.RefundInfo != null
                 })
                 .ToListAsync();
 
             return Success(reports);
         }
-
         public async Task<ResponseDTO> GetReportDetailAsync(Guid buyerId, Guid reportId)
         {
             if (buyerId == Guid.Empty)
@@ -211,6 +272,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             var report = await _reportRepo.AsQueryable()
                 .Include(r => r.Order)
                     .ThenInclude(o => o.Transaction)
+                .Include(r => r.Order)
+                    .ThenInclude(o => o.RefundInfo) // 🔥 thêm dòng này
                 .FirstOrDefaultAsync(r => r.Id == reportId && r.UserId == buyerId);
 
             if (report == null)
@@ -221,28 +284,36 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 ReportId = report.Id,
                 report.OrderId,
                 report.UserId,
+
                 OrderStatus = report.Order.Status.ToString(),
                 TransactionStatus = report.Order.Transaction == null
                     ? null
                     : report.Order.Transaction.Status.ToString(),
-                Type = MapReportType(report.Type),
-                TypeCode = (int)report.Type,
-                TypeKey = report.Type.ToString(),
+
                 Status = report.Status.ToString(),
-                StatusDisplay = MapReportStatusDisplay(report.Status),
-                NextAction = MapReportNextAction(report.Status),
+
                 report.Reason,
                 report.Description,
                 report.VideoUrl,
                 report.CreatedAt,
                 report.UpdatedAt,
-                CanSubmitRefundInfo =
+
+                // 🔥 trả luôn bank
+                refundInfo = report.Order.RefundInfo == null ? null : new
+                {
+                    report.Order.RefundInfo.BankName,
+                    report.Order.RefundInfo.BankAccountNumber,
+                    report.Order.RefundInfo.BankAccountName,
+                    report.Order.RefundInfo.RefundAmount
+                },
+
+                // 🔥 chỉ để FE biết có đang chờ hoàn tiền không
+                canRefund =
                     report.Status == ReportStatusEnum.Resolved &&
                     report.Order.Transaction != null &&
                     report.Order.Transaction.Status == TransactionStatusEnum.RefundPending
             });
         }
-
         public async Task<ResponseDTO> GetReportsForInspectorAsync(int page, int size, string? status, string? type)
         {
             return await GetReportsInternalAsync(page, size, status, type);
