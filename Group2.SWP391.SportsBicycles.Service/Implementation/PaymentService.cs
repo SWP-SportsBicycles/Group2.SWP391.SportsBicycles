@@ -172,6 +172,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (string.IsNullOrWhiteSpace(providerOrderCode))
                 return Fail(BusinessCode.INVALID_INPUT, "ProviderOrderCode không hợp lệ");
 
+            var code = providerOrderCode.Trim();
+
+            Console.WriteLine($"[PAYMENT SUCCESS] INPUT: '{providerOrderCode}'");
+            Console.WriteLine($"[PAYMENT SUCCESS] NORMALIZED: '{code}'");
+
             var transaction = await _transactionRepo.AsQueryable()
                 .Include(t => t.Order)
                     .ThenInclude(o => o.Shipment)
@@ -180,10 +185,27 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                         .ThenInclude(oi => oi.Bike)
                             .ThenInclude(b => b.Listing)
                                 .ThenInclude(l => l.User)
-                .FirstOrDefaultAsync(t => t.ProviderOrderCode == providerOrderCode);
+                .FirstOrDefaultAsync(t => t.ProviderOrderCode != null &&
+                                          t.ProviderOrderCode.Trim() == code);
 
             if (transaction == null)
+            {
+                Console.WriteLine("❌ TRANSACTION NOT FOUND");
+
+                // DEBUG DB VALUES
+                var allCodes = await _transactionRepo.AsQueryable()
+                    .Select(x => x.ProviderOrderCode)
+                    .ToListAsync();
+
+                foreach (var c in allCodes)
+                {
+                    Console.WriteLine($"DB VALUE: '{c}'");
+                }
+
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy transaction");
+            }
+
+            Console.WriteLine("✅ TRANSACTION FOUND");
 
             if (transaction.Status == TransactionStatusEnum.Paid)
             {
@@ -231,6 +253,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             }
 
             await _uow.SaveChangeAsync();
+
+            Console.WriteLine("✅ UPDATED TO PAID");
 
             return Success(new
             {
