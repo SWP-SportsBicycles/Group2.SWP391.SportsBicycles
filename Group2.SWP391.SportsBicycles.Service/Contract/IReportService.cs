@@ -16,7 +16,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
 
         // INSPECTOR
         Task<ResponseDTO> GetReportsForInspectorAsync(int page, int size, string? status, string? type);
-        Task<ResponseDTO> SubmitReportToAdminAsync(Guid reportId);
+        Task<ResponseDTO> InspectorConfirmReportAsync(Guid reportId);
+        Task<ResponseDTO> InspectorRejectReportAsync(Guid reportId);
 
 
         // ADMIN

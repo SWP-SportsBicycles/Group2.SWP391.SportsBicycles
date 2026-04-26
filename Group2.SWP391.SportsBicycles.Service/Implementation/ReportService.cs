@@ -63,10 +63,10 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             return status switch
             {
                 ReportStatusEnum.Pending => "Đang chờ Inspector kiểm định",
-                ReportStatusEnum.Reviewing => "Đang chờ Admin duyệt",
+                ReportStatusEnum.Reviewing => "Đã qua Inspector, đang chờ Admin duyệt",
                 ReportStatusEnum.Resolved => "Khiếu nại được chấp thuận - chờ hoàn tiền",
                 ReportStatusEnum.Rejected => "Khiếu nại đã bị từ chối",
-                _ => "Không xác định"
+                _ => $"Unknown ({status})"
             };
         }
 
@@ -75,10 +75,10 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             return status switch
             {
                 ReportStatusEnum.Pending => "Chờ Inspector kiểm tra report",
-                ReportStatusEnum.Reviewing => "Chờ Admin duyệt hoặc từ chối",
+                ReportStatusEnum.Reviewing => "Đã được Inspector xác nhận, chờ Admin xử lý",
                 ReportStatusEnum.Resolved => "Buyer có thể nhập thông tin tài khoản hoàn tiền",
                 ReportStatusEnum.Rejected => "Không thể hoàn tiền do report bị từ chối",
-                _ => "Không xác định"
+                _ => $"Unknown ({status})"
             };
         }
 
@@ -247,34 +247,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             return await GetReportsInternalAsync(page, size, status, type);
         }
 
-        public async Task<ResponseDTO> SubmitReportToAdminAsync(Guid reportId)
-        {
-            if (reportId == Guid.Empty)
-                return Fail(BusinessCode.INVALID_INPUT, "ReportId không hợp lệ");
-
-            var report = await _reportRepo.GetById(reportId);
-
-            if (report == null)
-                return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
-
-            if (report.Status != ReportStatusEnum.Pending)
-                return Fail(BusinessCode.INVALID_ACTION, "Chỉ được chuyển report đang Pending sang Admin review");
-
-            report.Status = ReportStatusEnum.Reviewing;
-
-            await _reportRepo.Update(report);
-            await _uow.SaveChangeAsync();
-
-            return Success(new
-            {
-                ReportId = report.Id,
-                Status = report.Status.ToString(),
-                StatusDisplay = MapReportStatusDisplay(report.Status),
-                NextAction = MapReportNextAction(report.Status),
-                Message = "Inspector đã kiểm tra và gửi report qua Admin duyệt",
-                report.UpdatedAt
-            }, BusinessCode.UPDATE_SUCESSFULLY);
-        }
 
         public async Task<ResponseDTO> GetReportsForAdminAsync(int page, int size, string? status, string? type)
         {
@@ -357,6 +329,68 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             }, BusinessCode.UPDATE_SUCESSFULLY);
         }
 
+        public async Task<ResponseDTO> InspectorConfirmReportAsync(Guid reportId)
+        {
+            if (reportId == Guid.Empty)
+                return Fail(BusinessCode.INVALID_INPUT, "ReportId không hợp lệ");
+
+            var report = await _reportRepo.GetById(reportId);
+
+            if (report == null)
+                return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
+
+            if (report.Status != ReportStatusEnum.Pending)
+                return Fail(BusinessCode.INVALID_ACTION, "Chỉ được confirm report đang Pending");
+
+            // Inspector xác nhận hợp lệ → chuyển lên admin
+            report.Status = ReportStatusEnum.Reviewing;
+
+            await _reportRepo.Update(report);
+            await _uow.SaveChangeAsync();
+
+            return Success(new
+            {
+                ReportId = report.Id,
+                Status = report.Status.ToString(),
+                StatusDisplay = MapReportStatusDisplay(report.Status),
+                NextAction = MapReportNextAction(report.Status),
+                Message = "Inspector đã xác nhận report hợp lệ và gửi lên Admin",
+                report.UpdatedAt
+            }, BusinessCode.UPDATE_SUCESSFULLY);
+        }
+
+
+
+        public async Task<ResponseDTO> InspectorRejectReportAsync(Guid reportId)
+        {
+            if (reportId == Guid.Empty)
+                return Fail(BusinessCode.INVALID_INPUT, "ReportId không hợp lệ");
+
+            var report = await _reportRepo.GetById(reportId);
+
+            if (report == null)
+                return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
+
+            if (report.Status != ReportStatusEnum.Pending)
+                return Fail(BusinessCode.INVALID_ACTION, "Chỉ được reject report đang Pending");
+
+            // Inspector từ chối luôn → kết thúc
+            report.Status = ReportStatusEnum.Rejected;
+
+            await _reportRepo.Update(report);
+            await _uow.SaveChangeAsync();
+
+            return Success(new
+            {
+                ReportId = report.Id,
+                Status = report.Status.ToString(),
+                StatusDisplay = MapReportStatusDisplay(report.Status),
+                NextAction = MapReportNextAction(report.Status),
+                Message = "Inspector đã từ chối report",
+                report.UpdatedAt
+            }, BusinessCode.UPDATE_SUCESSFULLY);
+        }
+
         private async Task<ResponseDTO> GetReportsInternalAsync(int page, int size, string? status, string? type)
         {
             if (page <= 0 || size <= 0)
@@ -419,5 +453,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 Items = items
             });
         }
+
+
+
+
     }
 }
