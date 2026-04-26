@@ -17,7 +17,7 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
         public string Password { get; set; } = default!;
         public string? AvtUrl { get; set; }
         public string? FirebaseUID { get; set; }
-
+        public int WarningCount { get; set; } = 0;
         public RoleEnum Role { get; set; }
         public decimal WalletBalance { get; set; }
 

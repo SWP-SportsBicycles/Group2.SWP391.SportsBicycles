@@ -1,6 +1,7 @@
 ﻿using Group2.SWP391.SportsBicycles.Common.DTOs;
 using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
 using Group2.SWP391.SportsBicycles.Common.Enums;
+using Group2.SWP391.SportsBicycles.Common.Helpers;
 using Group2.SWP391.SportsBicycles.DAL.Contract;
 using Group2.SWP391.SportsBicycles.DAL.Models;
 using Group2.SWP391.SportsBicycles.Services.Contract;
@@ -14,17 +15,17 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         private readonly IGenericRepository<Order> _orderRepo;
         private readonly ICloudinaryService _cloud;
         private readonly IUnitOfWork _uow;
+        private readonly IGenericRepository<User> _userRepo;
+        private readonly IEmailService _emailService;
 
-        public ReportService(
-            IGenericRepository<Report> reportRepo,
-            IGenericRepository<Order> orderRepo,
-            IUnitOfWork uow,
-            ICloudinaryService cloud)
+        public ReportService(IGenericRepository<Report> reportRepo, IGenericRepository<Order> orderRepo, ICloudinaryService cloud, IUnitOfWork uow, IGenericRepository<User> userRepo, IEmailService emailService)
         {
             _reportRepo = reportRepo;
             _orderRepo = orderRepo;
-            _uow = uow;
             _cloud = cloud;
+            _uow = uow;
+            _userRepo = userRepo;
+            _emailService = emailService;
         }
 
         private static ResponseDTO Success(
@@ -250,7 +251,18 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
         public async Task<ResponseDTO> GetReportsForAdminAsync(int page, int size, string? status, string? type)
         {
-            return await GetReportsInternalAsync(page, size, status, type);
+            var result = await GetReportsInternalAsync(page, size, status, type);
+
+            if (!result.IsSucess) return result;
+
+            var data = (dynamic)result.Data;
+
+            var filtered = ((IEnumerable<dynamic>)data.Items)
+                .Where(x => x.Status == ReportStatusEnum.Reviewing.ToString());
+
+            data.Items = filtered;
+
+            return Success(data);
         }
 
         public async Task<ResponseDTO> ApproveReportAsync(Guid reportId)
@@ -454,8 +466,108 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             });
         }
 
+        public async Task<ResponseDTO> ConfirmRefundAsync(Guid reportId)
+        {
+            ResponseDTO res = new ResponseDTO();
 
+            try
+            {
+                if (reportId == Guid.Empty)
+                    return Fail(BusinessCode.INVALID_INPUT, "ReportId không hợp lệ");
 
+                var report = await _reportRepo.AsQueryable()
+                    .Include(r => r.Order)
+                        .ThenInclude(o => o.User) // buyer
+                    .Include(r => r.Order)
+                        .ThenInclude(o => o.Transaction)
+                    .Include(r => r.Order)
+                        .ThenInclude(o => o.OrderItems)
+                            .ThenInclude(oi => oi.Bike)
+                                .ThenInclude(b => b.Listing)
+                    .FirstOrDefaultAsync(r => r.Id == reportId);
 
+                if (report == null)
+                    return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
+
+                if (report.Status != ReportStatusEnum.Resolved)
+                    return Fail(BusinessCode.INVALID_ACTION, "Report chưa sẵn sàng hoàn tiền");
+
+                var order = report.Order;
+                var buyer = order.User;
+
+                if (order.Transaction == null)
+                    return Fail(BusinessCode.DATA_NOT_FOUND, "Không có transaction");
+
+                if (order.Transaction.Status != TransactionStatusEnum.RefundPending)
+                    return Fail(BusinessCode.INVALID_ACTION, "Transaction không hợp lệ");
+
+                // ===== LẤY SELLER =====
+                var sellerId = order.OrderItems
+                    .Select(x => x.Bike.Listing.UserId)
+                    .FirstOrDefault();
+
+                var seller = await _userRepo.GetByExpression(x => x.Id == sellerId);
+
+                // ===== HOÀN TIỀN (GIẢ LẬP) =====
+                order.Transaction.Status = TransactionStatusEnum.Refunded;
+                order.Transaction.Description += " | Refund completed";
+
+                report.Status = ReportStatusEnum.Resolved;
+
+                // ===== GỬI MAIL BUYER =====
+                var subjectBuyer = "Hoàn tiền thành công";
+
+                var bodyBuyer = $@"
+Xin chào {buyer.FullName},<br/>
+Bạn đã được hoàn tiền đơn hàng <b>{order.Id}</b>.<br/>
+Số tiền: {order.Transaction.Amount} VND<br/>
+Cảm ơn bạn.";
+
+                await _emailService.SendEmailAsync(buyer.Email, subjectBuyer, bodyBuyer);
+
+                // ===== CẢNH CÁO SELLER =====
+                if (seller != null)
+                {
+                    seller.WarningCount += 1;
+
+                    var subjectSeller = "Cảnh cáo từ hệ thống";
+
+                    var bodySeller = $@"
+Xin chào {seller.FullName},<br/>
+Bạn đã bị cảnh cáo do vi phạm đơn hàng.<br/>
+Số lần cảnh cáo: {seller.WarningCount}/2";
+
+                    await _emailService.SendEmailAsync(seller.Email, subjectSeller, bodySeller);
+
+                    // ===== AUTO BAN =====
+                    if (seller.WarningCount >= 2)
+                    {
+                        seller.Status = UserStatusEnum.Banned;
+                        seller.UpdatedAt = DateTimeHelper.NowVN();
+
+                        await _emailService.SendEmailAsync(
+                            seller.Email,
+                            "Tài khoản bị khóa",
+                            "Bạn đã bị khóa do vi phạm nhiều lần");
+                    }
+
+                    await _userRepo.Update(seller);
+                }
+
+                await _uow.SaveChangeAsync();
+
+                res.IsSucess = true;
+                res.BusinessCode = BusinessCode.UPDATE_SUCESSFULLY;
+                res.Message = "Hoàn tiền thành công";
+            }
+            catch (Exception ex)
+            {
+                res.IsSucess = false;
+                res.BusinessCode = BusinessCode.EXCEPTION;
+                res.Message = ex.Message;
+            }
+
+            return res;
+        }
     }
 }
