@@ -139,33 +139,41 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.PaymentController
 
         [AllowAnonymous]
         [HttpPost("webhook")]
-        public async Task<IActionResult> Webhook([FromBody] JsonElement payload)
+        public async Task<IActionResult> Webhook()
         {
             try
             {
-                if (payload.TryGetProperty("data", out var data) &&
-                    data.TryGetProperty("orderCode", out var orderCodeElement))
-                {
-                    string orderCode = orderCodeElement.ValueKind switch
-                    {
-                        JsonValueKind.Number => orderCodeElement.GetInt64().ToString(),
-                        JsonValueKind.String => orderCodeElement.GetString() ?? string.Empty,
-                        _ => string.Empty
-                    };
+                using var reader = new StreamReader(Request.Body);
+                var body = await reader.ReadToEndAsync();
 
-                    if (!string.IsNullOrEmpty(orderCode))
+                if (!string.IsNullOrWhiteSpace(body))
+                {
+                    var payload = JsonDocument.Parse(body);
+
+                    if (payload.RootElement.TryGetProperty("data", out var data) &&
+                        data.TryGetProperty("orderCode", out var orderCodeElement))
                     {
-                        await _paymentService.HandlePaymentSuccessAsync(orderCode);
+                        var orderCode = orderCodeElement.ValueKind switch
+                        {
+                            JsonValueKind.Number => orderCodeElement.GetInt64().ToString(),
+                            JsonValueKind.String => orderCodeElement.GetString(),
+                            _ => null
+                        };
+
+                        if (!string.IsNullOrEmpty(orderCode))
+                        {
+                            await _paymentService.HandlePaymentSuccessAsync(orderCode);
+                        }
                     }
                 }
+            }
+            catch { }
 
-                // 🔥 LUÔN trả 200 cho PayOS
-                return Ok();
-            }
-            catch
+            // 🔥 QUAN TRỌNG
+            return Ok(new
             {
-                return Ok(); // vẫn trả 200
-            }
+                success = true
+            });
         }
 
     }
