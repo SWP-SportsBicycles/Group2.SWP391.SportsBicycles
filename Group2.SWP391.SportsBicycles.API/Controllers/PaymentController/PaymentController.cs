@@ -117,22 +117,22 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.PaymentController
             });
         }
 
+
+
+
         [AllowAnonymous]
-        [HttpGet("/payment-cancel")]
-        public IActionResult PaymentCancel(
-            [FromQuery] string? code,
-            [FromQuery] string? id,
-            [FromQuery] bool? cancel,
-            [FromQuery] string? status,
-            [FromQuery] long? orderCode)
+        [HttpGet("payment-success")] 
+        public async Task<IActionResult> PaymentSuccess(
+    [FromQuery] long? orderCode)
         {
+            if (orderCode != null)
+            {
+                await _paymentService.HandlePaymentSuccessAsync(orderCode.ToString());
+            }
+
             return Ok(new
             {
-                message = "Thanh toán bị hủy",
-                code,
-                id,
-                cancel,
-                status,
+                message = "Thanh toán thành công",
                 orderCode
             });
         }
