@@ -42,6 +42,12 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.AdminController
             var result = await _service.RejectReportAsync(reportId);
             return Ok(result);
         }
+        [HttpPut("{reportId:guid}/refund")]
+        public async Task<IActionResult> ConfirmRefund(Guid reportId)
+        {
+            var result = await _service.ConfirmRefundAsync(reportId);
+            return Ok(result);
+        }
     }
 }
 

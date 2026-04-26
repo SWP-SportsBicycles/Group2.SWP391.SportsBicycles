@@ -24,7 +24,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
         Task<ResponseDTO> GetReportsForAdminAsync(int page, int size, string? status, string? type);
         Task<ResponseDTO> ApproveReportAsync(Guid reportId);
         Task<ResponseDTO> RejectReportAsync(Guid reportId);
-
+        Task<ResponseDTO> ConfirmRefundAsync(Guid reportId);
 
     }
 }
