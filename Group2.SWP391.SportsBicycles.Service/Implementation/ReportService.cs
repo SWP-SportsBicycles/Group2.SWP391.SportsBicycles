@@ -237,7 +237,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     r.VideoUrl,
                     r.CreatedAt,
 
-                    // ===== REFUND =====
+                    // ===== TRANSACTION =====
                     transactionStatus = r.Order.Transaction == null
                         ? null
                         : r.Order.Transaction.Status.ToString(),
@@ -251,11 +251,25 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                                     ? "Đã hoàn tiền"
                                     : "Không có hoàn tiền",
 
+                    // ===== REFUND =====
                     refundAmount = r.Order.RefundInfo != null
                         ? r.Order.RefundInfo.RefundAmount
                         : 0,
 
-                    hasBankInfo = r.Order.RefundInfo != null
+                    hasBankInfo = r.Order.RefundInfo != null,
+
+                    // ===== BANK (MASK) =====
+                    bankInfo = r.Order.RefundInfo == null ? null : new
+                    {
+                        r.Order.RefundInfo.BankName,
+                        r.Order.RefundInfo.BankAccountName,
+                        BankAccountNumber =
+                            string.IsNullOrEmpty(r.Order.RefundInfo.BankAccountNumber)
+                                ? null
+                                : r.Order.RefundInfo.BankAccountNumber.Length > 4
+                                    ? "****" + r.Order.RefundInfo.BankAccountNumber.Substring(r.Order.RefundInfo.BankAccountNumber.Length - 4)
+                                    : r.Order.RefundInfo.BankAccountNumber
+                    }
                 })
                 .ToListAsync();
 
@@ -273,7 +287,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 .Include(r => r.Order)
                     .ThenInclude(o => o.Transaction)
                 .Include(r => r.Order)
-                    .ThenInclude(o => o.RefundInfo) // 🔥 thêm dòng này
+                    .ThenInclude(o => o.RefundInfo)
                 .FirstOrDefaultAsync(r => r.Id == reportId && r.UserId == buyerId);
 
             if (report == null)
@@ -286,6 +300,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 report.UserId,
 
                 OrderStatus = report.Order.Status.ToString(),
+
                 TransactionStatus = report.Order.Transaction == null
                     ? null
                     : report.Order.Transaction.Status.ToString(),
@@ -298,7 +313,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 report.CreatedAt,
                 report.UpdatedAt,
 
-                // 🔥 trả luôn bank
+                // ===== REFUND INFO (FULL - KHÔNG MASK) =====
                 refundInfo = report.Order.RefundInfo == null ? null : new
                 {
                     report.Order.RefundInfo.BankName,
@@ -307,7 +322,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     report.Order.RefundInfo.RefundAmount
                 },
 
-                // 🔥 chỉ để FE biết có đang chờ hoàn tiền không
+                // ===== FLAG =====
                 canRefund =
                     report.Status == ReportStatusEnum.Resolved &&
                     report.Order.Transaction != null &&
