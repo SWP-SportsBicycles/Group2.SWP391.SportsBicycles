@@ -164,7 +164,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             {
                 paymentUrl = paymentLink,
                 reused = false,
-                orderStatus = order.Status.ToString()
+                orderStatus = order.Status.ToString(),
+                providerOrderCode = transaction.ProviderOrderCode
             });
         }
         public async Task<ResponseDTO> HandlePaymentSuccessAsync(string providerOrderCode)
