@@ -251,95 +251,123 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
         public async Task<ResponseDTO> GetReportsForAdminAsync(int page, int size, string? status, string? type)
         {
-            var result = await GetReportsInternalAsync(page, size, status, type);
+            if (page <= 0 || size <= 0)
+                return Fail(BusinessCode.INVALID_INPUT, "Paging không hợp lệ");
 
-            if (!result.IsSucess) return result;
-
-            var data = (dynamic)result.Data;
-
-            var filtered = ((IEnumerable<dynamic>)data.Items)
-                .Where(x => x.Status == ReportStatusEnum.Reviewing.ToString());
-
-            data.Items = filtered;
-
-            return Success(data);
-        }
-
-        public async Task<ResponseDTO> ApproveReportAsync(Guid reportId)
-        {
-            if (reportId == Guid.Empty)
-                return Fail(BusinessCode.INVALID_INPUT, "ReportId không hợp lệ");
-
-            var report = await _reportRepo.AsQueryable()
+            var query = _reportRepo.AsQueryable()
                 .Include(r => r.Order)
                     .ThenInclude(o => o.Transaction)
-                .FirstOrDefaultAsync(r => r.Id == reportId);
+                .Include(r => r.User)
+                .Where(r =>
+                    r.Status == ReportStatusEnum.Reviewing &&
+                    r.Order.Transaction.Status == TransactionStatusEnum.Paid
+                );
 
-            if (report == null)
-                return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
+            var total = await query.CountAsync();
 
-            if (report.Status != ReportStatusEnum.Reviewing)
-                return Fail(BusinessCode.INVALID_ACTION, "Chỉ được duyệt report đã được Inspector gửi qua Admin");
-
-            if (report.Order == null)
-                return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy order của report");
-
-            if (report.Order.Transaction == null)
-                return Fail(BusinessCode.DATA_NOT_FOUND, "Order chưa có transaction");
-
-            if (report.Order.Transaction.Status != TransactionStatusEnum.Paid)
-                return Fail(BusinessCode.INVALID_ACTION, "Transaction không hợp lệ để tạo hoàn tiền");
-
-            report.Status = ReportStatusEnum.Resolved;
-            report.Order.Transaction.Status = TransactionStatusEnum.RefundPending;
-            report.Order.Transaction.Description =
-                (report.Order.Transaction.Description ?? "") +
-                " | Admin approved report, waiting buyer refund info";
-
-            await _reportRepo.Update(report);
-            await _uow.SaveChangeAsync();
-
-            return Success(new
-            {
-                ReportId = report.Id,
-                report.OrderId,
-                ReportStatus = report.Status.ToString(),
-                StatusDisplay = MapReportStatusDisplay(report.Status),
-                NextAction = MapReportNextAction(report.Status),
-                TransactionStatus = report.Order.Transaction.Status.ToString(),
-                Message = "Admin đã chấp thuận khiếu nại. Buyer có thể nhập thông tin hoàn tiền.",
-                report.UpdatedAt
-            }, BusinessCode.UPDATE_SUCESSFULLY);
-        }
-
-        public async Task<ResponseDTO> RejectReportAsync(Guid reportId)
-        {
-            if (reportId == Guid.Empty)
-                return Fail(BusinessCode.INVALID_INPUT, "ReportId không hợp lệ");
-
-            var report = await _reportRepo.GetById(reportId);
-
-            if (report == null)
-                return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
-
-            if (report.Status != ReportStatusEnum.Reviewing)
-                return Fail(BusinessCode.INVALID_ACTION, "Chỉ được từ chối report đã được Inspector gửi qua Admin");
-
-            report.Status = ReportStatusEnum.Rejected;
-
-            await _reportRepo.Update(report);
-            await _uow.SaveChangeAsync();
+            var items = await query
+                .OrderByDescending(x => x.CreatedAt)
+                .Skip((page - 1) * size)
+                .Take(size)
+                .Select(r => new
+                {
+                    ReportId = r.Id,
+                    r.OrderId,
+                    BuyerName = r.User.FullName,
+                    Status = r.Status.ToString(),
+                    StatusDisplay = MapReportStatusDisplay(r.Status),
+                    r.Reason,
+                    r.Description,
+                    r.VideoUrl,
+                    r.CreatedAt
+                })
+                .ToListAsync();
 
             return Success(new
             {
-                ReportId = report.Id,
-                ReportStatus = report.Status.ToString(),
-                StatusDisplay = MapReportStatusDisplay(report.Status),
-                NextAction = MapReportNextAction(report.Status),
-                Message = "Admin đã từ chối khiếu nại",
-                report.UpdatedAt
-            }, BusinessCode.UPDATE_SUCESSFULLY);
+                PageNumber = page,
+                PageSize = size,
+                TotalItems = total,
+                TotalPages = (int)Math.Ceiling(total / (double)size),
+                Items = items
+            });
         }
+
+        //public async Task<ResponseDTO> ApproveReportAsync(Guid reportId)
+        //{
+        //    if (reportId == Guid.Empty)
+        //        return Fail(BusinessCode.INVALID_INPUT, "ReportId không hợp lệ");
+
+        //    var report = await _reportRepo.AsQueryable()
+        //        .Include(r => r.Order)
+        //            .ThenInclude(o => o.Transaction)
+        //        .FirstOrDefaultAsync(r => r.Id == reportId);
+
+        //    if (report == null)
+        //        return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
+
+        //    if (report.Status != ReportStatusEnum.Reviewing)
+        //        return Fail(BusinessCode.INVALID_ACTION, "Chỉ được duyệt report đã được Inspector gửi qua Admin");
+
+        //    if (report.Order == null)
+        //        return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy order của report");
+
+        //    if (report.Order.Transaction == null)
+        //        return Fail(BusinessCode.DATA_NOT_FOUND, "Order chưa có transaction");
+
+        //    if (report.Order.Transaction.Status != TransactionStatusEnum.Paid)
+        //        return Fail(BusinessCode.INVALID_ACTION, "Transaction không hợp lệ để tạo hoàn tiền");
+
+        //    report.Status = ReportStatusEnum.Resolved;
+        //    report.Order.Transaction.Status = TransactionStatusEnum.RefundPending;
+        //    report.Order.Transaction.Description =
+        //        (report.Order.Transaction.Description ?? "") +
+        //        " | Admin approved report, waiting buyer refund info";
+
+        //    await _reportRepo.Update(report);
+        //    await _uow.SaveChangeAsync();
+
+        //    return Success(new
+        //    {
+        //        ReportId = report.Id,
+        //        report.OrderId,
+        //        ReportStatus = report.Status.ToString(),
+        //        StatusDisplay = MapReportStatusDisplay(report.Status),
+        //        NextAction = MapReportNextAction(report.Status),
+        //        TransactionStatus = report.Order.Transaction.Status.ToString(),
+        //        Message = "Admin đã chấp thuận khiếu nại. Buyer có thể nhập thông tin hoàn tiền.",
+        //        report.UpdatedAt
+        //    }, BusinessCode.UPDATE_SUCESSFULLY);
+        //}
+
+        //public async Task<ResponseDTO> RejectReportAsync(Guid reportId)
+        //{
+        //    if (reportId == Guid.Empty)
+        //        return Fail(BusinessCode.INVALID_INPUT, "ReportId không hợp lệ");
+
+        //    var report = await _reportRepo.GetById(reportId);
+
+        //    if (report == null)
+        //        return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
+
+        //    if (report.Status != ReportStatusEnum.Reviewing)
+        //        return Fail(BusinessCode.INVALID_ACTION, "Chỉ được từ chối report đã được Inspector gửi qua Admin");
+
+        //    report.Status = ReportStatusEnum.Rejected;
+
+        //    await _reportRepo.Update(report);
+        //    await _uow.SaveChangeAsync();
+
+        //    return Success(new
+        //    {
+        //        ReportId = report.Id,
+        //        ReportStatus = report.Status.ToString(),
+        //        StatusDisplay = MapReportStatusDisplay(report.Status),
+        //        NextAction = MapReportNextAction(report.Status),
+        //        Message = "Admin đã từ chối khiếu nại",
+        //        report.UpdatedAt
+        //    }, BusinessCode.UPDATE_SUCESSFULLY);
+        //}
 
         public async Task<ResponseDTO> InspectorConfirmReportAsync(Guid reportId)
         {
@@ -356,7 +384,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             // Inspector xác nhận hợp lệ → chuyển lên admin
             report.Status = ReportStatusEnum.Reviewing;
-
+            report.InspectorNote = "Xác nhận lỗi sản phẩm, cần hoàn tiền";
             await _reportRepo.Update(report);
             await _uow.SaveChangeAsync();
 
@@ -477,7 +505,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                 var report = await _reportRepo.AsQueryable()
                     .Include(r => r.Order)
-                        .ThenInclude(o => o.User) // buyer
+                        .ThenInclude(o => o.User)
                     .Include(r => r.Order)
                         .ThenInclude(o => o.Transaction)
                     .Include(r => r.Order)
@@ -489,17 +517,26 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 if (report == null)
                     return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
 
-                if (report.Status != ReportStatusEnum.Resolved)
-                    return Fail(BusinessCode.INVALID_ACTION, "Report chưa sẵn sàng hoàn tiền");
-
                 var order = report.Order;
                 var buyer = order.User;
+
+                if (order == null)
+                    return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy order");
 
                 if (order.Transaction == null)
                     return Fail(BusinessCode.DATA_NOT_FOUND, "Không có transaction");
 
-                if (order.Transaction.Status != TransactionStatusEnum.RefundPending)
+                // 🔥 FIX 1: đúng flow
+                if (report.Status != ReportStatusEnum.Reviewing)
+                    return Fail(BusinessCode.INVALID_ACTION, "Report chưa được Inspector xác nhận");
+
+                // 🔥 FIX 2: chỉ refund khi đã PAID
+                if (order.Transaction.Status != TransactionStatusEnum.Paid)
                     return Fail(BusinessCode.INVALID_ACTION, "Transaction không hợp lệ");
+
+                // 🔥 FIX 3: chặn refund lại
+                if (order.Transaction.Status == TransactionStatusEnum.Refunded)
+                    return Fail(BusinessCode.INVALID_ACTION, "Đơn đã được hoàn tiền trước đó");
 
                 // ===== LẤY SELLER =====
                 var sellerId = order.OrderItems
@@ -508,13 +545,14 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                 var seller = await _userRepo.GetByExpression(x => x.Id == sellerId);
 
-                // ===== HOÀN TIỀN (GIẢ LẬP) =====
+                // ===== HOÀN TIỀN =====
                 order.Transaction.Status = TransactionStatusEnum.Refunded;
                 order.Transaction.Description += " | Refund completed";
 
                 report.Status = ReportStatusEnum.Resolved;
+                report.UpdatedAt = DateTimeHelper.NowVN();
 
-                // ===== GỬI MAIL BUYER =====
+                // ===== MAIL BUYER =====
                 var subjectBuyer = "Hoàn tiền thành công";
 
                 var bodyBuyer = $@"
@@ -539,7 +577,7 @@ Số lần cảnh cáo: {seller.WarningCount}/2";
 
                     await _emailService.SendEmailAsync(seller.Email, subjectSeller, bodySeller);
 
-                    // ===== AUTO BAN =====
+                    // 🔥 AUTO BAN
                     if (seller.WarningCount >= 2)
                     {
                         seller.Status = UserStatusEnum.Banned;
@@ -567,7 +605,60 @@ Số lần cảnh cáo: {seller.WarningCount}/2";
                 res.Message = ex.Message;
             }
 
-            return res;
+            return res; 
+        }
+        public async Task<ResponseDTO> GetReportDetailForAdminAsync(Guid reportId)
+        {
+            if (reportId == Guid.Empty)
+                return Fail(BusinessCode.INVALID_INPUT, "ReportId không hợp lệ");
+
+            var report = await _reportRepo.AsQueryable()
+                .Include(r => r.Order)
+                    .ThenInclude(o => o.User)
+                .Include(r => r.Order)
+                    .ThenInclude(o => o.Transaction)
+                .Include(r => r.Order)
+                    .ThenInclude(o => o.RefundInfo)
+                .FirstOrDefaultAsync(r => r.Id == reportId);
+
+            if (report == null)
+                return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
+
+            var order = report.Order;
+
+            var data = new
+            {
+                reportId = report.Id,
+                orderId = order.Id,
+
+                // ===== BUYER =====
+                buyerId = order.UserId,
+                buyerName = order.User.FullName,
+                buyerEmail = order.User.Email,
+
+                // ===== INSPECTOR =====
+                inspectorMessage = report.InspectorNote,
+
+                // ===== ORDER =====
+                orderStatus = order.Status.ToString(),
+
+                // ===== TRANSACTION =====
+                transactionStatus = order.Transaction.Status.ToString(),
+                totalAmount = order.TotalAmount,
+
+                // ===== REFUND =====
+                refundAmount = order.RefundInfo?.RefundAmount ?? 0,
+
+                // ===== BANK =====
+                bankName = order.RefundInfo?.BankName,
+                bankAccountNumber = order.RefundInfo?.BankAccountNumber,
+                bankAccountName = order.RefundInfo?.BankAccountName,
+
+                // ===== FLAG =====
+                canRefund = order.Transaction.Status == TransactionStatusEnum.RefundPending
+            };
+
+            return Success(data);
         }
     }
 }

@@ -23,5 +23,6 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
 
         public Guid UserId { get; set; }
         public User User { get; set; } = default!;
+        public string? InspectorNote { get; set; }
     }
 }
