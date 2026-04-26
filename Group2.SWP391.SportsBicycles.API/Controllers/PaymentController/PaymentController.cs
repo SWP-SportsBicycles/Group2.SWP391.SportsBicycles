@@ -141,22 +141,31 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.PaymentController
         [HttpPost("webhook")]
         public async Task<IActionResult> Webhook([FromBody] JsonElement payload)
         {
-            if (!payload.TryGetProperty("data", out var data))
-                return BadRequest("Thiếu data");
-
-            if (!data.TryGetProperty("orderCode", out var orderCodeElement))
-                return BadRequest("Thiếu orderCode");
-
-            string orderCode = orderCodeElement.ValueKind switch
+            try
             {
-                JsonValueKind.Number => orderCodeElement.GetInt64().ToString(),
-                JsonValueKind.String => orderCodeElement.GetString() ?? string.Empty,
-                _ => string.Empty
-            };
+                if (payload.TryGetProperty("data", out var data) &&
+                    data.TryGetProperty("orderCode", out var orderCodeElement))
+                {
+                    string orderCode = orderCodeElement.ValueKind switch
+                    {
+                        JsonValueKind.Number => orderCodeElement.GetInt64().ToString(),
+                        JsonValueKind.String => orderCodeElement.GetString() ?? string.Empty,
+                        _ => string.Empty
+                    };
 
-            var result = await _paymentService.HandlePaymentSuccessAsync(orderCode);
+                    if (!string.IsNullOrEmpty(orderCode))
+                    {
+                        await _paymentService.HandlePaymentSuccessAsync(orderCode);
+                    }
+                }
 
-            return HandleResult(result);
+                // 🔥 LUÔN trả 200 cho PayOS
+                return Ok();
+            }
+            catch
+            {
+                return Ok(); // vẫn trả 200
+            }
         }
 
     }
