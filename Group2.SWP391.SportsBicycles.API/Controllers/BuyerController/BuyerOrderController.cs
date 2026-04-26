@@ -12,7 +12,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
     [ApiController]
     [Route("api/buyer-order")]
     [Authorize(Roles = "BUYER")]
-    public class BuyerOrderController : ControllerBase
+    public class BuyerOrderController : BaseController
     {
         private readonly IBuyerOrderService _service;
 
@@ -96,46 +96,6 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.BuyerController
 
             return HandleResult(result);
         }
-        private IActionResult HandleResult(ResponseDTO result)
-        {
-            if (result == null)
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError, new ResponseDTO
-                {
-                    IsSucess = false,
-                    BusinessCode = BusinessCode.INTERNAL_ERROR,
-                    Message = "Lỗi hệ thống"
-                });
-            }
-
-            if (!result.IsSucess)
-            {
-                return result.BusinessCode switch
-                {
-                    BusinessCode.DATA_NOT_FOUND => NotFound(result),
-
-                    BusinessCode.INVALID_INPUT
-                    or BusinessCode.INVALID_DATA
-                    or BusinessCode.INVALID_ACTION
-                    or BusinessCode.VALIDATION_ERROR
-                    or BusinessCode.VALIDATION_FAILED => BadRequest(result),
-
-                    BusinessCode.AUTH_NOT_FOUND
-                    or BusinessCode.WRONG_PASSWORD => Unauthorized(result),
-
-                    BusinessCode.ACCESS_DENIED
-                    or BusinessCode.PERMISSION_DENIED => StatusCode(StatusCodes.Status403Forbidden, result),
-
-                    BusinessCode.EXCEPTION
-                    or BusinessCode.INTERNAL_ERROR => StatusCode(StatusCodes.Status500InternalServerError, result),
-
-                    BusinessCode.CREATED_SUCCESSFULLY => StatusCode(StatusCodes.Status201Created, result),
-
-                    _ => Ok(result)
-                };
-            }
-
-            return Ok(result);
-        }
+        
     }
 }

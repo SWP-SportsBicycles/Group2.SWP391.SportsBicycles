@@ -11,7 +11,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.PaymentController
 {
     [ApiController]
     [Route("api/payment")]
-    public class PaymentController : ControllerBase
+    public class PaymentController : BaseController
     {
         private readonly IPaymentService _paymentService;
 
@@ -159,48 +159,5 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.PaymentController
             return HandleResult(result);
         }
 
-        private IActionResult HandleResult(ResponseDTO result)
-        {
-            if (result == null)
-            {
-                return StatusCode(500, new ResponseDTO
-                {
-                    IsSucess = false,
-                    BusinessCode = BusinessCode.INTERNAL_ERROR,
-                    Message = "Lỗi hệ thống"
-                });
-            }
-
-            if (!result.IsSucess)
-            {
-                return result.BusinessCode switch
-                {
-                    BusinessCode.DATA_NOT_FOUND => NotFound(result),
-
-                    BusinessCode.VALIDATION_FAILED
-                        or BusinessCode.VALIDATION_ERROR
-                        or BusinessCode.INVALID_INPUT
-                        or BusinessCode.INVALID_DATA
-                        or BusinessCode.INVALID_ACTION => BadRequest(result),
-
-                    BusinessCode.AUTH_NOT_FOUND
-                        or BusinessCode.WRONG_PASSWORD => Unauthorized(result),
-
-                    BusinessCode.ACCESS_DENIED
-                        or BusinessCode.PERMISSION_DENIED => Forbid(),
-
-                    BusinessCode.EXCEPTION
-                        or BusinessCode.INTERNAL_ERROR => StatusCode(500, result),
-
-                    _ => BadRequest(result)
-                };
-            }
-
-            return result.BusinessCode switch
-            {
-                BusinessCode.CREATED_SUCCESSFULLY => StatusCode(201, result),
-                _ => Ok(result)
-            };
-        }
     }
 }

@@ -9,7 +9,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.InspectorController
     [ApiController]
     [Route("api/inspector-report")]
     [Authorize(Roles = "INSPECTOR")]
-    public class InspectorReportController : ControllerBase
+    public class InspectorReportController : BaseController
     {
         private readonly IReportService _service;
 
@@ -26,7 +26,7 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.InspectorController
             [FromQuery] string? type = null)
         {
             var result = await _service.GetReportsForInspectorAsync(page, size, status, type);
-            return Ok(result);
+            return HandleResult(result);
         }
 
       
@@ -36,14 +36,14 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.InspectorController
         public async Task<IActionResult> ConfirmReport(Guid reportId)
         {
             var result = await _service.InspectorConfirmReportAsync(reportId);
-            return Ok(result);
+            return HandleResult(result);
         }
 
         [HttpPut("{reportId:guid}/reject")]
         public async Task<IActionResult> RejectReport(Guid reportId)
         {
             var result = await _service.InspectorRejectReportAsync(reportId);
-            return Ok(result);
+            return HandleResult(result);
         }
     }
 }
