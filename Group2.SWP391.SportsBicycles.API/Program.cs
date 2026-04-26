@@ -85,6 +85,7 @@ builder.Services.AddScoped<IWishlistService, WishlistService>();
 
 builder.Services.AddScoped<ISellerOrderService, SellerOrderService>();
 builder.Services.AddScoped<ISellerShippingProfileService, SellerShippingProfileService>();
+builder.Services.AddScoped<IFakeShipmentService, FakeShipmentService>();
 
 
 builder.Services.Configure<GhnSettings>(
