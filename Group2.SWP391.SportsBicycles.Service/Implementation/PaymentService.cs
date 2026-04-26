@@ -199,60 +199,26 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             var order = transaction.Order;
 
+            // ✅ nếu đã bị cancel trước đó → vẫn accept tiền
             if (order.Status == OrderStatusEnum.Cancelled)
             {
-                transaction.Status = TransactionStatusEnum.Failed;
-                transaction.Description = "Thanh toán bị từ chối vì order đã bị hủy hoặc hết hạn";
-
-                foreach (var item in order.OrderItems)
-                {
-                    if (item.Bike != null &&
-                        item.Bike.Status == BikeStatusEnum.Reserved)
-                    {
-                        item.Bike.Status = BikeStatusEnum.Available;
-                    }
-                }
-
-                await _uow.SaveChangeAsync();
-
-                return Fail(
-                    BusinessCode.INVALID_ACTION,
-                    "Order đã hết hạn hoặc đã bị hủy, không thể xác nhận thanh toán");
+                order.Status = OrderStatusEnum.Paid;
             }
 
-            if (order.Status == OrderStatusEnum.Locked &&
-                order.ExpiresAt != null &&
-                order.ExpiresAt <= DateTime.UtcNow)
-            {
-                transaction.Status = TransactionStatusEnum.Failed;
-                transaction.Description = "Thanh toán bị từ chối vì order đã hết hạn";
-
-                order.Status = OrderStatusEnum.Cancelled;
-
-                foreach (var item in order.OrderItems)
-                {
-                    if (item.Bike != null &&
-                        item.Bike.Status == BikeStatusEnum.Reserved)
-                    {
-                        item.Bike.Status = BikeStatusEnum.Available;
-                    }
-                }
-
-                await _uow.SaveChangeAsync();
-
-                return Fail(
-                    BusinessCode.INVALID_ACTION,
-                    "Order đã hết thời gian giữ chỗ, vui lòng tạo lại đơn hàng");
-            }
-
+            // ✅ nếu đã Paid → không phá data
             if (order.Status == OrderStatusEnum.Paid)
             {
-                transaction.Status = TransactionStatusEnum.Failed;
-                transaction.Description = "Thanh toán bị từ chối vì order đã được thanh toán trước đó";
+                transaction.Status = TransactionStatusEnum.Paid;
+                transaction.PaidAt = DateTime.UtcNow;
 
                 await _uow.SaveChangeAsync();
 
-                return Fail(BusinessCode.INVALID_ACTION, "Order đã được thanh toán rồi");
+                return Success(new
+                {
+                    message = "Đã xử lý trước đó",
+                    orderId = order.Id,
+                    orderStatus = order.Status.ToString()
+                });
             }
 
             transaction.Status = TransactionStatusEnum.Paid;
@@ -269,10 +235,10 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             return Success(new
             {
                 message = "Thanh toán thành công, chờ seller confirm",
-                orderId = order.Id
+                orderId = order.Id,
+                orderStatus = order.Status.ToString()
             });
         }
-
         public async Task<ResponseDTO> CancelOrderAsync(Guid buyerId, Guid orderId, string? reason)
         {
             if (buyerId == Guid.Empty)
