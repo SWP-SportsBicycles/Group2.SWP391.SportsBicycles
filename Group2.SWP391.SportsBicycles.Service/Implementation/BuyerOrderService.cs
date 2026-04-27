@@ -58,31 +58,22 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (buyerId == Guid.Empty)
                 return Fail(BusinessCode.AUTH_NOT_FOUND, "Không xác định được người dùng");
 
-            if (dto == null)
+            if (dto == null || dto.BikeId == Guid.Empty)
                 return Fail(BusinessCode.INVALID_INPUT, "Dữ liệu không hợp lệ");
 
-            if (dto.BikeId == Guid.Empty)
-                return Fail(BusinessCode.INVALID_INPUT, "BikeId không hợp lệ");
-
-            if (string.IsNullOrWhiteSpace(dto.ReceiverName))
-                return Fail(BusinessCode.INVALID_DATA, "Thiếu tên người nhận");
-
-            if (string.IsNullOrWhiteSpace(dto.ReceiverPhone))
-                return Fail(BusinessCode.INVALID_DATA, "Thiếu số điện thoại người nhận");
-
-            if (string.IsNullOrWhiteSpace(dto.ReceiverAddress))
-                return Fail(BusinessCode.INVALID_DATA, "Thiếu địa chỉ người nhận");
+            if (string.IsNullOrWhiteSpace(dto.ReceiverName) ||
+                string.IsNullOrWhiteSpace(dto.ReceiverPhone) ||
+                string.IsNullOrWhiteSpace(dto.ReceiverAddress))
+                return Fail(BusinessCode.INVALID_DATA, "Thiếu thông tin người nhận");
 
             if (dto.ToDistrictId <= 0 || string.IsNullOrWhiteSpace(dto.ToWardCode))
                 return Fail(BusinessCode.INVALID_DATA, "Thiếu thông tin địa chỉ giao hàng");
 
-            Guid orderId;
-            decimal subTotal;
-            decimal shippingFee;
-            decimal totalAmount;
-            object itemData;
-
             await _uow.BeginTransactionAsync();
+
+            Guid orderId;
+            decimal subTotal, shippingFee, totalAmount;
+            object itemData;
 
             try
             {
@@ -90,14 +81,10 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     .Include(b => b.Listing)
                         .ThenInclude(l => l.User)
                             .ThenInclude(u => u.SellerShippingProfiles)
-                    .Include(b => b.Medias)
                     .FirstOrDefaultAsync(b => b.Id == dto.BikeId);
 
-                if (bike == null)
-                    return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy bike");
-
-                if (bike.Listing == null)
-                    return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy listing");
+                if (bike == null || bike.Listing == null)
+                    return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy sản phẩm");
 
                 if (bike.Listing.UserId == buyerId)
                     return Fail(BusinessCode.INVALID_ACTION, "Không thể mua xe của chính mình");
@@ -106,7 +93,20 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     return Fail(BusinessCode.INVALID_ACTION, "Listing chưa được publish");
 
                 if (bike.Status != BikeStatusEnum.Available)
-                    return Fail(BusinessCode.INVALID_ACTION, "Bike không khả dụng để đặt mua");
+                    return Fail(BusinessCode.INVALID_ACTION, "Bike không khả dụng");
+
+                // 🔥 chỉ block khi đã PAID
+                var hasActiveOrder = await _orderRepo.AsQueryable()
+                    .AnyAsync(o =>
+                        o.OrderItems.Any(oi => oi.BikeId == dto.BikeId) &&
+                        (
+                            o.Status == OrderStatusEnum.Paid ||
+                            o.Status == OrderStatusEnum.Confirmed ||
+                            o.Status == OrderStatusEnum.Shipping
+                        ));
+
+                if (hasActiveOrder)
+                    return Fail(BusinessCode.INVALID_ACTION, "Bike đã được mua");
 
                 var sellerProfile = bike.Listing.User?.SellerShippingProfiles?
                     .OrderByDescending(x => x.IsDefault)
@@ -114,33 +114,13 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     .FirstOrDefault();
 
                 if (sellerProfile == null)
-                    return Fail(BusinessCode.DATA_NOT_FOUND, "Seller chưa cấu hình địa chỉ giao hàng");
-
-                var now = DateTime.UtcNow;
-
-                var hasActiveOrder = await _orderRepo.AsQueryable()
-                    .AnyAsync(o =>
-                        o.OrderItems.Any(oi => oi.BikeId == dto.BikeId) &&
-                        (
-                            (
-                                o.Status == OrderStatusEnum.Locked &&
-                                o.ExpiresAt != null &&
-                                o.ExpiresAt > now
-                            )
-                            ||
-                            o.Status == OrderStatusEnum.Paid ||
-                            o.Status == OrderStatusEnum.Confirmed ||
-                            o.Status == OrderStatusEnum.Shipping
-                        ));
-
-                if (hasActiveOrder)
-                    return Fail(BusinessCode.INVALID_ACTION, "Bike đã có người đặt");
+                    return Fail(BusinessCode.DATA_NOT_FOUND, "Seller chưa cấu hình giao hàng");
 
                 var price = bike.SalePrice > 0 ? bike.SalePrice : bike.Price;
 
                 subTotal = price;
 
-                var feeResult = await _shippingProviderClient.CalculateFeeAsync(
+                var fee = await _shippingProviderClient.CalculateFeeAsync(
                     "GHN",
                     sellerProfile.FromDistrictId,
                     sellerProfile.FromWardCode,
@@ -149,23 +129,22 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     (int)price
                 );
 
-                if (!feeResult.IsSuccess)
-                    return Fail(BusinessCode.INVALID_ACTION, feeResult.ErrorMessage ?? "Không tính được phí ship GHN");
+                if (!fee.IsSuccess)
+                    return Fail(BusinessCode.INVALID_ACTION, "Không tính được phí ship");
 
-                shippingFee = feeResult.Fee;
+                shippingFee = fee.Fee;
                 totalAmount = subTotal + shippingFee;
 
                 var order = new Order
                 {
                     Id = Guid.NewGuid(),
                     UserId = buyerId,
-                    Status = OrderStatusEnum.Locked,
-                    ExpiresAt = DateTime.UtcNow.AddMinutes(2),
+                    Status = OrderStatusEnum.Pending, // 🔥 không lock
+                    ExpiresAt = null,
 
                     ReceiverName = dto.ReceiverName.Trim(),
                     ReceiverPhone = dto.ReceiverPhone.Trim(),
                     ReceiverAddress = dto.ReceiverAddress.Trim(),
-
                     ToDistrictId = dto.ToDistrictId,
                     ToWardCode = dto.ToWardCode.Trim(),
 
@@ -187,20 +166,16 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                 await _orderItemRepo.Insert(orderItem);
 
-                // ❌ REMOVE: bike.Status = Reserved
+                await _uow.SaveChangeAsync();
+                await _uow.CommitAsync();
 
                 orderId = order.Id;
 
                 itemData = new
                 {
-                    OrderItemId = orderItem.Id,
                     BikeId = bike.Id,
-                    UnitPrice = price,
-                    LineTotal = price
+                    UnitPrice = price
                 };
-
-                await _uow.SaveChangeAsync();
-                await _uow.CommitAsync();
             }
             catch
             {
@@ -208,10 +183,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 throw;
             }
 
-            var paymentResult = await _paymentService.CreatePaymentLink(buyerId, orderId);
-
-            if (!paymentResult.IsSucess)
-                return paymentResult;
+            var payment = await _paymentService.CreatePaymentLink(buyerId, orderId);
+            if (!payment.IsSucess) return payment;
 
             return Success(new
             {
@@ -219,11 +192,10 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 SubTotal = subTotal,
                 ShippingFee = shippingFee,
                 TotalAmount = totalAmount,
-                Status = OrderStatusEnum.Locked.ToString(),
-                ExpiresAt = DateTime.UtcNow.AddMinutes(2),
-                Payment = paymentResult.Data,
+                Status = "Pending",
+                Payment = payment.Data,
                 Items = new List<object> { itemData }
-            }, BusinessCode.CREATED_SUCCESSFULLY);
+            });
         }
         public async Task<ResponseDTO> MarkOrderPaidAsync(Guid orderId)
         {
