@@ -10,5 +10,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
     public interface IAdminDashboardService
     {
         Task<ResponseDTO> GetDashboardAsync();
+        Task<ResponseDTO> GetRevenueAnalyticsAsync(int months = 6);
+        Task<ResponseDTO> GetListingAnalyticsAsync();
+        Task<ResponseDTO> GetUserAnalyticsAsync();
     }
 }

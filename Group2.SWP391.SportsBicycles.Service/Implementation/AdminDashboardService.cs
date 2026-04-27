@@ -331,5 +331,108 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 return Fail("Lỗi dashboard: " + ex.Message);
             }
         }
+
+        public async Task<ResponseDTO> GetRevenueAnalyticsAsync(int months = 6)
+        {
+            try
+            {
+                var fromDate = DateTime.UtcNow.AddMonths(-months);
+
+                var rawData = await _orderRepo.AsQueryable()
+                    .Where(o =>
+                        !o.IsDeleted &&
+                        o.Status == OrderStatusEnum.Completed &&
+                        o.CompletedAt.HasValue &&
+                        o.CompletedAt.Value >= fromDate
+                    )
+                    .GroupBy(o => new
+                    {
+                        o.CompletedAt.Value.Year,
+                        o.CompletedAt.Value.Month
+                    })
+                    .Select(g => new
+                    {
+                        g.Key.Year,
+                        g.Key.Month,
+                        gmv = g.Sum(x => x.TotalAmount)
+                    })
+                    .ToListAsync();
+
+                var data = rawData
+                    .Select(x => new
+                    {
+                        month = $"{x.Year}-{x.Month:D2}",
+                        gmv = x.gmv,
+                        revenue = x.gmv * 0.05m
+                    })
+                    .OrderBy(x => x.month)
+                    .ToList();
+
+                return Success(data);
+            }
+            catch (Exception ex)
+            {
+                return Fail("Lỗi revenue analytics: " + ex.Message);
+            }
+        }
+
+        public async Task<ResponseDTO> GetListingAnalyticsAsync()
+        {
+            try
+            {
+                var query = _listingRepo.AsQueryable().Where(x => !x.IsDeleted);
+
+                var total = await query.CountAsync();
+
+                var pending = await query.CountAsync(x =>
+                    x.Status == ListingStatusEnum.PendingInspection ||
+                    x.Status == ListingStatusEnum.PendingReview);
+
+                var approved = await query.CountAsync(x =>
+                    x.Status == ListingStatusEnum.Published);
+
+                var rejected = await query.CountAsync(x =>
+                    x.Status == ListingStatusEnum.Rejected);
+
+                var data = new
+                {
+                    total,
+                    pending,
+                    approved,
+                    rejected
+                };
+
+                return Success(data);
+            }
+            catch (Exception ex)
+            {
+                return Fail("Lỗi listing analytics: " + ex.Message);
+            }
+        }
+
+        public async Task<ResponseDTO> GetUserAnalyticsAsync()
+        {
+            try
+            {
+                var query = _userRepo.AsQueryable();
+
+                var total = await query.CountAsync();
+                var buyerCount = await query.CountAsync(x => x.Role == RoleEnum.BUYER);
+                var sellerCount = await query.CountAsync(x => x.Role == RoleEnum.SELLER);
+
+                var data = new
+                {
+                    total,
+                    buyerCount,
+                    sellerCount
+                };
+
+                return Success(data);
+            }
+            catch (Exception ex)
+            {
+                return Fail("Lỗi user analytics: " + ex.Message);
+            }
+        }
     }
 }
