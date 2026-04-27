@@ -128,7 +128,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                                 o.ExpiresAt > now
                             )
                             ||
-                            o.Status == OrderStatusEnum.Pending ||
                             o.Status == OrderStatusEnum.Paid ||
                             o.Status == OrderStatusEnum.Confirmed ||
                             o.Status == OrderStatusEnum.Shipping
@@ -142,19 +141,18 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 subTotal = price;
 
                 var feeResult = await _shippingProviderClient.CalculateFeeAsync(
-     "GHN",
-     sellerProfile.FromDistrictId,
-     sellerProfile.FromWardCode,
-     dto.ToDistrictId,
-     dto.ToWardCode,
-     (int)price
- );
+                    "GHN",
+                    sellerProfile.FromDistrictId,
+                    sellerProfile.FromWardCode,
+                    dto.ToDistrictId,
+                    dto.ToWardCode,
+                    (int)price
+                );
 
                 if (!feeResult.IsSuccess)
                     return Fail(BusinessCode.INVALID_ACTION, feeResult.ErrorMessage ?? "Không tính được phí ship GHN");
 
                 shippingFee = feeResult.Fee;
-
                 totalAmount = subTotal + shippingFee;
 
                 var order = new Order
@@ -189,7 +187,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                 await _orderItemRepo.Insert(orderItem);
 
-                bike.Status = BikeStatusEnum.Reserved;
+                // ❌ REMOVE: bike.Status = Reserved
 
                 orderId = order.Id;
 
@@ -198,21 +196,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     OrderItemId = orderItem.Id,
                     BikeId = bike.Id,
                     UnitPrice = price,
-                    LineTotal = price,
-
-                    Bike = new
-                    {
-                        bike.Brand,
-                        bike.Category,
-                        bike.FrameSize,
-                        bike.SalePrice,
-                        Title = bike.Listing.Title,
-                        Thumbnail = bike.Medias
-                            .Where(m => !string.IsNullOrWhiteSpace(m.Image))
-                            .OrderBy(m => m.Type)
-                            .Select(m => m.Image)
-                            .FirstOrDefault() ?? string.Empty
-                    }
+                    LineTotal = price
                 };
 
                 await _uow.SaveChangeAsync();
@@ -237,9 +221,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 TotalAmount = totalAmount,
                 Status = OrderStatusEnum.Locked.ToString(),
                 ExpiresAt = DateTime.UtcNow.AddMinutes(2),
-
                 Payment = paymentResult.Data,
-
                 Items = new List<object> { itemData }
             }, BusinessCode.CREATED_SUCCESSFULLY);
         }
