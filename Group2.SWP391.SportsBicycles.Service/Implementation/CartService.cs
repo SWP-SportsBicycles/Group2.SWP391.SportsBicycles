@@ -16,7 +16,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         private readonly IGenericRepository<Order> _orderRepo;
         private readonly IGenericRepository<OrderItem> _orderItemRepo;
         private readonly IShippingProviderClient _shippingClient;
-
+        private readonly IPaymentService _paymentService;
         private readonly IUnitOfWork _uow;
 
         public CartService(
@@ -26,6 +26,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             IGenericRepository<Order> orderRepo,
             IGenericRepository<OrderItem> orderItemRepo,
                 IShippingProviderClient shippingClient,
+                IPaymentService paymentService,
 
             IUnitOfWork uow)
         {
@@ -36,6 +37,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             _orderItemRepo = orderItemRepo;
             _shippingClient = shippingClient;
             _uow = uow;
+                _paymentService = paymentService;
         }
 
         private static ResponseDTO Success(
@@ -311,24 +313,10 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         public async Task<ResponseDTO> CreateOrderFromSelectedCartAsync(Guid buyerId, CreateOrderFromCartDTO dto)
         {
             if (buyerId == Guid.Empty)
-                return Fail(BusinessCode.AUTH_NOT_FOUND, "Không xác định được người dùng");
-
-            await ReleaseExpiredLockedOrdersAsync();
+                return Fail(BusinessCode.AUTH_NOT_FOUND, "Không xác định người dùng");
 
             if (dto == null)
                 return Fail(BusinessCode.INVALID_INPUT, "Dữ liệu không hợp lệ");
-
-            if (string.IsNullOrWhiteSpace(dto.ReceiverName))
-                return Fail(BusinessCode.INVALID_DATA, "Thiếu tên người nhận");
-
-            if (string.IsNullOrWhiteSpace(dto.ReceiverPhone))
-                return Fail(BusinessCode.INVALID_DATA, "Thiếu số điện thoại người nhận");
-
-            if (string.IsNullOrWhiteSpace(dto.ReceiverAddress))
-                return Fail(BusinessCode.INVALID_DATA, "Thiếu địa chỉ người nhận");
-
-            if (dto.ToDistrictId <= 0 || string.IsNullOrWhiteSpace(dto.ToWardCode))
-                return Fail(BusinessCode.INVALID_DATA, "Thiếu thông tin địa chỉ giao hàng");
 
             var cart = await _cartRepo.AsQueryable()
                 .Include(c => c.CartItems)
@@ -336,83 +324,51 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                         .ThenInclude(b => b.Listing)
                             .ThenInclude(l => l.User)
                                 .ThenInclude(u => u.SellerShippingProfiles)
-                .Include(c => c.CartItems)
-                    .ThenInclude(ci => ci.Bike)
-                        .ThenInclude(b => b.Medias)
                 .FirstOrDefaultAsync(c => c.UserId == buyerId);
 
             if (cart == null)
-                return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy giỏ hàng");
+                return Fail(BusinessCode.DATA_NOT_FOUND, "Không có giỏ hàng");
 
-            var selectedItems = cart.CartItems
-                .Where(x => x.IsSelected)
-                .ToList();
+            var items = cart.CartItems.Where(x => x.IsSelected).ToList();
+            if (!items.Any())
+                return Fail(BusinessCode.INVALID_ACTION, "Chưa chọn sản phẩm");
 
-            if (!selectedItems.Any())
-                return Fail(BusinessCode.INVALID_ACTION, "Vui lòng chọn ít nhất 1 sản phẩm để thanh toán");
-
-            foreach (var item in selectedItems)
+            foreach (var item in items)
             {
-                if (item.Bike == null)
-                    return Fail(BusinessCode.DATA_NOT_FOUND, "Bike không tồn tại");
+                var bike = item.Bike!;
+                if (bike.Listing!.Status != ListingStatusEnum.Published || bike.Status != BikeStatusEnum.Available)
+                    return Fail(BusinessCode.INVALID_ACTION, "Sản phẩm không khả dụng");
 
-                if (item.Bike.Listing == null)
-                    return Fail(BusinessCode.DATA_NOT_FOUND, "Listing không tồn tại");
+                var hasActive = await _orderRepo.AsQueryable()
+                    .AnyAsync(o =>
+                        o.OrderItems.Any(oi => oi.BikeId == bike.Id) &&
+                        (
+                            o.Status == OrderStatusEnum.Paid ||
+                            o.Status == OrderStatusEnum.Confirmed ||
+                            o.Status == OrderStatusEnum.Shipping
+                        ));
 
-                if (item.Bike.Listing.UserId == buyerId)
-                    return Fail(BusinessCode.INVALID_ACTION, "Không thể mua xe của chính mình");
-
-                if (item.Bike.Listing.Status != ListingStatusEnum.Published)
-                    return Fail(BusinessCode.INVALID_ACTION, "Có sản phẩm chưa được publish");
-
-                if (item.Bike.Status != BikeStatusEnum.Available)
-                    return Fail(BusinessCode.INVALID_ACTION, $"Bike {item.Bike.Id} không còn khả dụng");
-
-                var hasActiveOrder = await HasActiveOrderForBikeAsync(item.BikeId);
-
-                if (hasActiveOrder)
-                    return Fail(BusinessCode.INVALID_ACTION, $"Bike {item.BikeId} đã có người đặt");
+                if (hasActive)
+                    return Fail(BusinessCode.INVALID_ACTION, "Có sản phẩm đã được mua");
             }
 
-            var sellerIds = selectedItems
-                .Select(x => x.Bike!.Listing!.UserId)
-                .Distinct()
-                .ToList();
-
-            if (sellerIds.Count > 1)
-                return Fail(BusinessCode.INVALID_ACTION, "Chỉ được thanh toán các sản phẩm của cùng một seller trong một đơn hàng");
-
-            var sellerProfile = selectedItems
-                .Select(x => x.Bike!.Listing!.User?.SellerShippingProfiles?
-                    .OrderByDescending(p => p.IsDefault)
-                    .ThenByDescending(p => p.CreatedAt)
-                    .FirstOrDefault())
+            var sellerProfile = items.First().Bike!.Listing!.User!.SellerShippingProfiles!
+                .OrderByDescending(x => x.IsDefault)
                 .FirstOrDefault();
 
-            if (sellerProfile == null)
-                return Fail(BusinessCode.DATA_NOT_FOUND, "Seller chưa cấu hình địa chỉ giao hàng");
+            var subTotal = items.Sum(x => x.Bike!.SalePrice > 0 ? x.Bike.SalePrice : x.Bike.Price);
 
-            foreach (var item in selectedItems)
-            {
-                item.UnitPrice = item.Bike!.SalePrice;
-            }
-
-            var subTotal = selectedItems.Sum(x => x.UnitPrice);
-
-            var feeResult = await _shippingClient.CalculateFeeAsync(
+            var fee = await _shippingClient.CalculateFeeAsync(
                 "GHN",
-                sellerProfile.FromDistrictId,
+                sellerProfile!.FromDistrictId,
                 sellerProfile.FromWardCode,
                 dto.ToDistrictId,
                 dto.ToWardCode,
                 (int)subTotal
             );
 
-            if (!feeResult.IsSuccess)
-                return Fail(BusinessCode.INVALID_ACTION, feeResult.ErrorMessage ?? "Không tính được phí ship GHN");
-
-            var shippingFee = feeResult.Fee;
-            var totalAmount = subTotal + shippingFee;
+            var shippingFee = fee.Fee;
+            var total = subTotal + shippingFee;
 
             await _uow.BeginTransactionAsync();
 
@@ -422,73 +378,42 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 {
                     Id = Guid.NewGuid(),
                     UserId = buyerId,
-
-                    // ✅ FIX QUAN TRỌNG
-                    Status = OrderStatusEnum.Locked,
-                    ExpiresAt = DateTime.UtcNow.AddMinutes(15),
-
-                    ReceiverName = dto.ReceiverName.Trim(),
-                    ReceiverPhone = dto.ReceiverPhone.Trim(),
-                    ReceiverAddress = dto.ReceiverAddress.Trim(),
-                    ToDistrictId = dto.ToDistrictId,
-                    ToWardCode = dto.ToWardCode.Trim(),
-
+                    Status = OrderStatusEnum.Pending, // 🔥 không lock
+                    ExpiresAt = null,
                     SubTotal = subTotal,
                     ShippingFee = shippingFee,
-                    TotalAmount = totalAmount
+                    TotalAmount = total
                 };
 
                 await _orderRepo.Insert(order);
 
-                foreach (var item in selectedItems)
+                foreach (var item in items)
                 {
-                    var orderItem = new OrderItem
+                    await _orderItemRepo.Insert(new OrderItem
                     {
                         Id = Guid.NewGuid(),
                         OrderId = order.Id,
                         BikeId = item.BikeId,
-                        UnitPrice = item.UnitPrice,
-                        LineTotal = item.UnitPrice
-                    };
+                        UnitPrice = item.Bike!.SalePrice > 0 ? item.Bike.SalePrice : item.Bike.Price,
+                        LineTotal = item.Bike!.SalePrice > 0 ? item.Bike.SalePrice : item.Bike.Price
+                    });
 
-                    await _orderItemRepo.Insert(orderItem);
-                }
-
-                foreach (var item in selectedItems)
-                {
                     await _cartItemRepo.Delete(item);
                 }
 
                 await _uow.SaveChangeAsync();
                 await _uow.CommitAsync();
 
+                var payment = await _paymentService.CreatePaymentLink(buyerId, order.Id);
+                if (!payment.IsSucess) return payment;
+
                 return Success(new
                 {
                     OrderId = order.Id,
-                    SubTotal = order.SubTotal,
-                    ShippingFee = order.ShippingFee,
-                    TotalAmount = order.TotalAmount,
-                    Status = order.Status.ToString(),
-                    ExpiresAt = order.ExpiresAt,
-
-                    Items = selectedItems.Select(x => new
-                    {
-                        CartItemId = x.Id,
-                        BikeId = x.BikeId,
-                        UnitPrice = x.UnitPrice,
-                        LineTotal = x.UnitPrice,
-
-                        Bike = new
-                        {
-                            x.Bike!.Brand,
-                            x.Bike.Category,
-                            x.Bike.FrameSize,
-                            x.Bike.SalePrice,
-                            Title = x.Bike.Listing?.Title,
-                            Thumbnail = GetThumbnail(x.Bike)
-                        }
-                    }).ToList()
-                }, BusinessCode.CREATED_SUCCESSFULLY);
+                    TotalAmount = total,
+                    Status = "Pending",
+                    Payment = payment.Data
+                });
             }
             catch
             {
