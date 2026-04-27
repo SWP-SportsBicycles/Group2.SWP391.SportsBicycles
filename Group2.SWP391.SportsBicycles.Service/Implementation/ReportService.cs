@@ -247,7 +247,13 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     OrderStatus = r.Order.Status.ToString(),
                     Type = MapReportType(r.Type),
                     Status = r.Status.ToString(),
-                    StatusDisplay = MapReportStatusDisplay(r.Status),
+                    StatusDisplay =
+            r.Status == ReportStatusEnum.Resolved
+        ? (r.Order.Transaction != null &&
+           r.Order.Transaction.Status == TransactionStatusEnum.Refunded
+            ? "Khiếu nại đã xử lý - đã hoàn tiền"
+            : "Khiếu nại được chấp thuận - chờ hoàn tiền")
+        : MapReportStatusDisplay(r.Status),
                     NextAction = MapReportNextAction(r.Status),
 
                     r.Reason,
