@@ -14,10 +14,16 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public string ReceiverPhone { get; set; } = default!;
         public string ReceiverAddress { get; set; } = default!;
 
-        public int ToDistrictId { get; set; }          // thêm
-        public string ToWardCode { get; set; } = default!; // thêm
+        public int ToProvinceId { get; set; }          // ✅ thêm
+        public string ToProvinceName { get; set; } = default!; // ✅ thêm
 
+        public int ToDistrictId { get; set; }
+        public string ToDistrictName { get; set; } = default!; // ✅ thêm
+
+        public string ToWardCode { get; set; } = default!;
+        public string ToWardName { get; set; } = default!; // ✅ thêm
     }
+}
 
     public class PreviewCheckoutDTO
     {
@@ -29,4 +35,4 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
 
         public decimal DistanceKm { get; set; }
     }
-}
+
