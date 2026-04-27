@@ -359,6 +359,44 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         }
 
 
+        public async Task<ResponseDTO> GetReportDetailForInspectorAsync(Guid reportId)
+        {
+            if (reportId == Guid.Empty)
+                return Fail(BusinessCode.INVALID_INPUT, "ReportId không hợp lệ");
+
+            var report = await _reportRepo.AsQueryable()
+                .Include(r => r.Order)
+                    .ThenInclude(o => o.Transaction)
+                .Include(r => r.User)
+                .FirstOrDefaultAsync(r => r.Id == reportId);
+
+            if (report == null)
+                return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy report");
+
+            return Success(new
+            {
+                ReportId = report.Id,
+                report.OrderId,
+                BuyerName = report.User.FullName,
+
+                OrderStatus = report.Order.Status.ToString(),
+                TransactionStatus = report.Order.Transaction == null
+                    ? null
+                    : report.Order.Transaction.Status.ToString(),
+
+                Type = MapReportType(report.Type),
+                Status = report.Status.ToString(),
+                StatusDisplay = MapReportStatusDisplay(report.Status),
+                NextAction = MapReportNextAction(report.Status),
+
+                report.Reason,
+                report.Description,
+                report.VideoUrl,
+                report.CreatedAt,
+                report.UpdatedAt
+            });
+        }
+
         public async Task<ResponseDTO> GetReportsForAdminAsync(int page, int size, string? status, string? type)
         {
             if (page <= 0 || size <= 0)
