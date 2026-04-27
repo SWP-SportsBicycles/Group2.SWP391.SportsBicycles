@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Group2.SWP391.SportsBicycles.API.Controllers.AdminController
 {
     [Route("api/[controller]")]
-   // [Authorize(Roles = nameof(RoleEnum.ADMIN))]
+   [Authorize(Roles = nameof(RoleEnum.ADMIN))]
     [ApiController]
     public class AdminDashboardController : ControllerBase
     {

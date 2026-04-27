@@ -145,6 +145,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     ReceiverName = dto.ReceiverName.Trim(),
                     ReceiverPhone = dto.ReceiverPhone.Trim(),
                     ReceiverAddress = dto.ReceiverAddress.Trim(),
+                    ToProvinceId = dto.ToProvinceId,
+                    ToProvinceName = dto.ToProvinceName?.Trim(),
+                    ToDistrictName = dto.ToDistrictName?.Trim(),
+                    ToWardName = dto.ToWardName?.Trim(),
+
                     ToDistrictId = dto.ToDistrictId,
                     ToWardCode = dto.ToWardCode.Trim(),
 
@@ -274,6 +279,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 ReceiverAddress = o.ReceiverAddress,
                 ToDistrictId = o.ToDistrictId,
                 ToWardCode = o.ToWardCode,
+
+                ToProvinceId = o.ToProvinceId,
+                ToProvinceName = o.ToProvinceName,
+                ToDistrictName = o.ToDistrictName,
+                ToWardName = o.ToWardName,
 
                 CreatedAt = o.CreatedAt,
                 UpdatedAt = o.UpdatedAt,
@@ -411,9 +421,29 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                 ReceiverName = order.ReceiverName,
                 ReceiverPhone = order.ReceiverPhone,
-                ReceiverAddress = order.ReceiverAddress,
-                ToDistrictId = order.ToDistrictId,
-                ToWardCode = order.ToWardCode,
+
+                // ===== FULL ADDRESS (QUAN TRỌNG) =====
+                Address = new
+                {
+                    ProvinceId = order.ToProvinceId,
+                    ProvinceName = order.ToProvinceName,
+
+                    DistrictId = order.ToDistrictId,
+                    DistrictName = order.ToDistrictName,
+
+                    WardCode = order.ToWardCode,
+                    WardName = order.ToWardName,
+
+                    Detail = order.ReceiverAddress,
+
+                    FullAddress = string.Join(", ", new[]
+          {
+            order.ReceiverAddress,
+            order.ToWardName,
+            order.ToDistrictName,
+            order.ToProvinceName
+        }.Where(x => !string.IsNullOrWhiteSpace(x)))
+                },
 
                 CreatedAt = order.CreatedAt,
                 UpdatedAt = order.UpdatedAt,
@@ -474,10 +504,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                         SalePrice = oi.Bike.SalePrice,
 
                         Status = oi.Bike.Status.ToString(),
-                        City = oi.Bike.City,
 
-                        Title = oi.Bike.Listing == null ? null : oi.Bike.Listing.Title,
-                        Description = oi.Bike.Listing == null ? null : oi.Bike.Listing.Description,
+                        // 👉 FIX luôn city cho chuẩn (nếu cần mapping)
+                        City = oi.Bike.City,
+                        Title = oi.Bike.Listing?.Title,
+                        Description = oi.Bike.Listing?.Description,
 
                         Images = oi.Bike.Medias
                             .Where(m => !string.IsNullOrWhiteSpace(m.Image))

@@ -112,6 +112,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     profile.SenderAddress = dto.SenderAddress.Trim();
                     profile.FromDistrictId = dto.FromDistrictId;
                     profile.FromWardCode = dto.FromWardCode;
+                    profile.FromWardName = dto.FromWardName?.Trim();
+                    profile.FromDistrictName = dto.FromDistrictName?.Trim();
+                    profile.FromProvinceName = dto.FromProvinceName?.Trim();
                     profile.BankName = dto.BankName.Trim();
                     profile.BankAccountNumber = dto.BankAccountNumber.Trim();
                     profile.BankAccountName = dto.BankAccountName.Trim();

@@ -30,7 +30,7 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
         public string? ToWardName { get; set; }
         public string? ToDistrictName { get; set; }
         public string? ToProvinceName { get; set; }
-
+        public int? ToProvinceId { get; set; }
         public decimal? DistanceKm { get; set; }
 
         // tiền
