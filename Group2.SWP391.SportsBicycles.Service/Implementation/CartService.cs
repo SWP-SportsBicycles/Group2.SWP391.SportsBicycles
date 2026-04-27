@@ -400,19 +400,18 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             var subTotal = selectedItems.Sum(x => x.UnitPrice);
 
             var feeResult = await _shippingClient.CalculateFeeAsync(
-     "GHN",
-     sellerProfile.FromDistrictId,
-     sellerProfile.FromWardCode,
-     dto.ToDistrictId,
-     dto.ToWardCode,
-     (int)subTotal
- );
+                "GHN",
+                sellerProfile.FromDistrictId,
+                sellerProfile.FromWardCode,
+                dto.ToDistrictId,
+                dto.ToWardCode,
+                (int)subTotal
+            );
 
             if (!feeResult.IsSuccess)
                 return Fail(BusinessCode.INVALID_ACTION, feeResult.ErrorMessage ?? "Không tính được phí ship GHN");
 
             var shippingFee = feeResult.Fee;
-
             var totalAmount = subTotal + shippingFee;
 
             await _uow.BeginTransactionAsync();
@@ -423,8 +422,10 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 {
                     Id = Guid.NewGuid(),
                     UserId = buyerId,
-                    Status = OrderStatusEnum.Pending,
-                    ExpiresAt = null,
+
+                    // ✅ FIX QUAN TRỌNG
+                    Status = OrderStatusEnum.Locked,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(15),
 
                     ReceiverName = dto.ReceiverName.Trim(),
                     ReceiverPhone = dto.ReceiverPhone.Trim(),
@@ -451,7 +452,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     };
 
                     await _orderItemRepo.Insert(orderItem);
-
                 }
 
                 foreach (var item in selectedItems)
@@ -496,7 +496,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 throw;
             }
         }
-
         public async Task<ResponseDTO> PreviewCheckoutAsync(Guid userId, PreviewCheckoutDTO dto)
         {
             if (userId == Guid.Empty)
