@@ -203,6 +203,24 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                 var totalSellers = await userQuery
                     .CountAsync(x => x.Role == RoleEnum.SELLER);
+                var totalOrders = await _orderRepo.AsQueryable()
+                    .Include(o => o.Transaction)
+                    .CountAsync(o =>
+                        !o.IsDeleted &&
+                        o.Transaction != null &&
+                        o.Transaction.Status == TransactionStatusEnum.Paid);
+                var completedOrders = await _orderRepo.AsQueryable()
+                    .Include(o => o.Transaction)
+                    .CountAsync(o =>
+                        o.Status == OrderStatusEnum.Completed &&
+                        o.Transaction != null &&
+                        o.Transaction.Status == TransactionStatusEnum.Paid);
+                var processingOrders = await _orderRepo.AsQueryable()
+                    .Include(o => o.Transaction)
+                    .CountAsync(o =>
+                        o.Status != OrderStatusEnum.Completed &&
+                        o.Transaction != null &&
+                        o.Transaction.Status == TransactionStatusEnum.Paid);
 
                 // ================= REVENUE (🔥 FIX CHUẨN) =================
 
@@ -314,7 +332,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     ActiveListings = activeListings,
                     TotalUsers = totalUsers,
                     TotalSellers = totalSellers,
-
+                    TotalOrders = totalOrders,
+                    CompletedOrders = completedOrders,
+                    ProcessingOrders = processingOrders,
                     BuyerFeeRevenue = buyerFeeRevenue,
                     SellerFeeRevenue = sellerFeeRevenue,
                     InspectionRevenue = inspectionRevenue,

@@ -378,7 +378,12 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 {
                     Id = Guid.NewGuid(),
                     UserId = buyerId,
-                    Status = OrderStatusEnum.Pending, // 🔥 không lock
+                    Status = OrderStatusEnum.Pending,
+                    ReceiverName = dto.ReceiverName.Trim(),
+                    ReceiverPhone = dto.ReceiverPhone.Trim(),
+                    ReceiverAddress = dto.ReceiverAddress.Trim(),
+                    ToDistrictId = dto.ToDistrictId,
+                    ToWardCode = dto.ToWardCode,// 🔥 không lock
                     ExpiresAt = null,
                     SubTotal = subTotal,
                     ShippingFee = shippingFee,

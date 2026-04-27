@@ -19,7 +19,9 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public decimal BuyerFeeRevenue { get; set; }
         public decimal SellerFeeRevenue { get; set; }
         public decimal InspectionRevenue { get; set; }
-
+        public int TotalOrders { get; set; }          
+        public int CompletedOrders { get; set; }     
+        public int ProcessingOrders { get; set; }
         public List<CityStatsDTO> Cities { get; set; } = new();
     }
 
