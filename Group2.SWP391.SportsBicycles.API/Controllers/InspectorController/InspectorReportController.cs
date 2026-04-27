@@ -29,7 +29,12 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.InspectorController
             return HandleResult(result);
         }
 
-      
+        [HttpGet("{reportId:guid}")]
+        public async Task<IActionResult> GetReportDetail(Guid reportId)
+        {
+            var result = await _service.GetReportDetailForInspectorAsync(reportId);
+            return HandleResult(result);
+        }
 
 
         [HttpPut("{reportId:guid}/confirm")]
