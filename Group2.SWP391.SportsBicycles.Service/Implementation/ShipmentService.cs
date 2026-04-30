@@ -159,6 +159,13 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (firstBike?.Listing == null)
                 return Fail(BusinessCode.DATA_NOT_FOUND, "Không tìm thấy thông tin listing của order");
 
+
+            int weight = (int)(firstBike.Weight * 1000);
+
+            if (firstBike.Weight <= 0)
+                return Fail(BusinessCode.INVALID_DATA, "Weight không hợp lệ");
+
+
             var sellerId = firstBike.Listing.UserId;
 
             var profile = await _sellerProfileRepo.AsQueryable()
@@ -182,24 +189,43 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             if (string.IsNullOrWhiteSpace(profile.FromWardCode))
                 return Fail(BusinessCode.INVALID_DATA, "Seller chưa có FromWardCode hợp lệ");
 
+
+
+            var feeResult = await _shippingProviderClient.CalculateFeeAsync(
+    provider: provider,
+    fromDistrictId: profile.FromDistrictId,
+    fromWardCode: profile.FromWardCode.Trim(),
+    toDistrictId: (int)order.ToDistrictId,
+    toWardCode: order.ToWardCode.Trim(),
+    insuranceValue: 0,
+    weight: weight
+);
+
+            if (!feeResult.IsSuccess)
+                return Fail(BusinessCode.INVALID_ACTION, feeResult.ErrorMessage ?? "Không tính được phí ship");
+
+            order.ShippingFee = feeResult.Fee;
+
+
             var providerResult = await _shippingProviderClient.CreateOrderAsync(
-                provider: provider,
+     provider: provider,
 
-                senderName: profile.SenderName.Trim(),
-                senderPhone: profile.SenderPhone.Trim(),
-                senderAddress: profile.SenderAddress.Trim(),
-                fromDistrictId: profile.FromDistrictId,
-                fromWardCode: profile.FromWardCode.Trim(),
+     senderName: profile.SenderName.Trim(),
+     senderPhone: profile.SenderPhone.Trim(),
+     senderAddress: profile.SenderAddress.Trim(),
+     fromDistrictId: profile.FromDistrictId,
+     fromWardCode: profile.FromWardCode.Trim(),
 
-                receiverName: order.ReceiverName.Trim(),
-                receiverPhone: order.ReceiverPhone.Trim(),
-                receiverAddress: order.ReceiverAddress.Trim(),
-                toDistrictId: (int)order.ToDistrictId,
-                toWardCode: order.ToWardCode.Trim(),
+     receiverName: order.ReceiverName.Trim(),
+     receiverPhone: order.ReceiverPhone.Trim(),
+     receiverAddress: order.ReceiverAddress.Trim(),
+     toDistrictId: (int)order.ToDistrictId,
+     toWardCode: order.ToWardCode.Trim(),
 
-                codAmount: codAmount,
-                note: note
-            );
+     codAmount: codAmount,
+     note: note,
+     weight: weight // 👈 FIX CHỖ NÀY
+ );
 
             if (!providerResult.IsSuccess)
             {

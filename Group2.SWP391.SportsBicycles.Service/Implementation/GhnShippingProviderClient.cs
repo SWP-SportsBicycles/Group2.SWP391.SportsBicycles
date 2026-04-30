@@ -39,40 +39,30 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         }
 
         public async Task<(bool IsSuccess, string? ProviderOrderCode, string? TrackingUrl, string? ErrorMessage)> CreateOrderAsync(
-            string provider,
-            string senderName,
-            string senderPhone,
-            string senderAddress,
-            int fromDistrictId,
-            string? fromWardCode,
-            string receiverName,
-            string receiverPhone,
-            string receiverAddress,
-            int toDistrictId,
-            string toWardCode,
-            int codAmount,
-            string? note)
+     string provider,
+     string senderName,
+     string senderPhone,
+     string senderAddress,
+     int fromDistrictId,
+     string? fromWardCode,
+     string receiverName,
+     string receiverPhone,
+     string receiverAddress,
+     int toDistrictId,
+     string toWardCode,
+     int codAmount,
+     string? note,
+     int weight
+ )
         {
             try
             {
                 if (!string.Equals(provider, "GHN", StringComparison.OrdinalIgnoreCase))
                     return (false, null, null, "Provider không được hỗ trợ");
 
-                if (fromDistrictId <= 0)
-                    return (false, null, null, "fromDistrictId không hợp lệ");
-
-                if (toDistrictId <= 0)
-                    return (false, null, null, "toDistrictId không hợp lệ");
-
-                if (string.IsNullOrWhiteSpace(fromWardCode))
-                    return (false, null, null, "fromWardCode không được để trống");
-
-                if (string.IsNullOrWhiteSpace(toWardCode))
-                    return (false, null, null, "toWardCode không được để trống");
-
                 var serviceResult = await GetAvailableServiceAsync(fromDistrictId, toDistrictId);
                 if (!serviceResult.IsSuccess || serviceResult.ServiceId == null)
-                    return (false, null, null, serviceResult.ErrorMessage ?? "Không lấy được service GHN");
+                    return (false, null, null, serviceResult.ErrorMessage);
 
                 var payload = new
                 {
@@ -94,7 +84,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                     service_id = serviceResult.ServiceId.Value,
 
-                    weight = 1000,
+                    weight = weight, // ✅ FIX
                     length = 30,
                     width = 20,
                     height = 10,
@@ -105,32 +95,25 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                     items = new[]
                     {
-                        new
-                        {
-                            name = "Sports Bicycle",
-                            quantity = 1,
-                            price = 0,
-                            length = 30,
-                            width = 20,
-                            height = 10,
-                            weight = 1000,
-                            category = new
-                            {
-                                level1 = "Xe đạp"
-                            }
-                        }
-                    }
+                new
+                {
+                    name = "Sports Bicycle",
+                    quantity = 1,
+                    price = 0,
+                    length = 30,
+                    width = 20,
+                    height = 10,
+                    weight = weight, // ✅ FIX
+                    category = new { level1 = "Xe đạp" }
+                }
+            }
                 };
-
-                var json = JsonSerializer.Serialize(payload);
-                Console.WriteLine("GHN CREATE PAYLOAD: " + json);
 
                 var response = await _httpClient.PostAsync(
                     "v2/shipping-order/create",
-                    new StringContent(json, Encoding.UTF8, "application/json"));
+                    new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
 
                 var body = await response.Content.ReadAsStringAsync();
-                Console.WriteLine("GHN CREATE RESPONSE: " + body);
 
                 if (!response.IsSuccessStatusCode)
                     return (false, null, null, body);
@@ -138,20 +121,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 using var doc = JsonDocument.Parse(body);
                 var root = doc.RootElement;
 
-                var code = root.GetProperty("code").GetInt32();
-                if (code != 200)
-                {
-                    var message = root.TryGetProperty("message", out var msg)
-                        ? msg.GetString()
-                        : body;
-                    return (false, null, null, message);
-                }
+                if (root.GetProperty("code").GetInt32() != 200)
+                    return (false, null, null, root.GetProperty("message").GetString());
 
-                var data = root.GetProperty("data");
-                var orderCode = data.GetProperty("order_code").GetString();
+                var orderCode = root.GetProperty("data").GetProperty("order_code").GetString();
 
-                // GHN không trả tracking url public trực tiếp ở API create
-                // tạm build link tra cứu theo mã đơn
                 var trackingUrl = !string.IsNullOrWhiteSpace(orderCode)
                     ? $"https://donhang.ghn.vn/?order_code={orderCode}"
                     : null;
@@ -285,34 +259,24 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         }
 
         public async Task<(bool IsSuccess, decimal Fee, string? ErrorMessage)> CalculateFeeAsync(
-    string provider,
-    int fromDistrictId,
-    string fromWardCode,
-    int toDistrictId,
-    string toWardCode,
-    int insuranceValue)
+     string provider,
+     int fromDistrictId,
+     string fromWardCode,
+     int toDistrictId,
+     string toWardCode,
+     int insuranceValue,
+     int weight
+ )
         {
             try
             {
                 if (!string.Equals(provider, "GHN", StringComparison.OrdinalIgnoreCase))
                     return (false, 0, "Provider không được hỗ trợ");
 
-                if (fromDistrictId <= 0)
-                    return (false, 0, "fromDistrictId không hợp lệ");
-
-                if (toDistrictId <= 0)
-                    return (false, 0, "toDistrictId không hợp lệ");
-
-                if (string.IsNullOrWhiteSpace(fromWardCode))
-                    return (false, 0, "fromWardCode không được để trống");
-
-                if (string.IsNullOrWhiteSpace(toWardCode))
-                    return (false, 0, "toWardCode không được để trống");
-
                 var serviceResult = await GetAvailableServiceAsync(fromDistrictId, toDistrictId);
 
                 if (!serviceResult.IsSuccess || serviceResult.ServiceId == null)
-                    return (false, 0, serviceResult.ErrorMessage ?? "Không lấy được service GHN");
+                    return (false, 0, serviceResult.ErrorMessage);
 
                 var payload = new
                 {
@@ -325,21 +289,17 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     to_district_id = toDistrictId,
                     to_ward_code = toWardCode,
 
-                    weight = 1000,
+                    weight = weight, // ✅ FIX
                     length = 30,
                     width = 20,
                     height = 10
                 };
 
-                var json = JsonSerializer.Serialize(payload);
-                Console.WriteLine("GHN FEE PAYLOAD: " + json);
-
                 var response = await _httpClient.PostAsync(
                     "v2/shipping-order/fee",
-                    new StringContent(json, Encoding.UTF8, "application/json"));
+                    new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"));
 
                 var body = await response.Content.ReadAsStringAsync();
-                Console.WriteLine("GHN FEE RESPONSE: " + body);
 
                 if (!response.IsSuccessStatusCode)
                     return (false, 0, body);
@@ -347,24 +307,12 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 using var doc = JsonDocument.Parse(body);
                 var root = doc.RootElement;
 
-                var code = root.GetProperty("code").GetInt32();
+                if (root.GetProperty("code").GetInt32() != 200)
+                    return (false, 0, root.GetProperty("message").GetString());
 
-                if (code != 200)
-                {
-                    var message = root.TryGetProperty("message", out var msg)
-                        ? msg.GetString()
-                        : body;
+                var fee = root.GetProperty("data").GetProperty("total").GetDecimal();
 
-                    return (false, 0, message);
-                }
-
-                var data = root.GetProperty("data");
-
-                var totalFee = data.TryGetProperty("total", out var total)
-                    ? total.GetDecimal()
-                    : 0;
-
-                return (true, totalFee, null);
+                return (true, fee, null);
             }
             catch (Exception ex)
             {

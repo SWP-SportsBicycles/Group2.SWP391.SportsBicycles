@@ -357,15 +357,19 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 .FirstOrDefault();
 
             var subTotal = items.Sum(x => x.Bike!.SalePrice > 0 ? x.Bike.SalePrice : x.Bike.Price);
+            int weight = items
+    .Where(x => x.Bike != null)
+    .Sum(x => (int)(x.Bike!.Weight * 1000));
 
             var fee = await _shippingClient.CalculateFeeAsync(
-                "GHN",
-                sellerProfile!.FromDistrictId,
-                sellerProfile.FromWardCode,
-                dto.ToDistrictId,
-                dto.ToWardCode,
-                (int)subTotal
-            );
+      "GHN",
+      sellerProfile!.FromDistrictId,
+      sellerProfile.FromWardCode,
+      dto.ToDistrictId,
+      dto.ToWardCode,
+      (int)subTotal,
+      weight // 👈 FIX
+  );
 
             var shippingFee = fee.Fee;
             var total = subTotal + shippingFee;
@@ -514,14 +518,20 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
             var subTotal = selectedItems.Sum(x => x.UnitPrice);
 
+
+            int weight = selectedItems
+    .Where(x => x.Bike != null)
+    .Sum(x => (int)(x.Bike!.Weight * 1000));
+
             var feeResult = await _shippingClient.CalculateFeeAsync(
-     "GHN",
-     sellerProfile.FromDistrictId,
-     sellerProfile.FromWardCode,
-     dto.ToDistrictId,
-     dto.ToWardCode,
-     (int)subTotal
- );
+    "GHN",
+    sellerProfile.FromDistrictId,
+    sellerProfile.FromWardCode,
+    dto.ToDistrictId,
+    dto.ToWardCode,
+    (int)subTotal,
+    weight // 👈 FIX
+);
 
             if (!feeResult.IsSuccess)
                 return Fail(BusinessCode.INVALID_ACTION, feeResult.ErrorMessage ?? "Không tính được phí ship GHN");
