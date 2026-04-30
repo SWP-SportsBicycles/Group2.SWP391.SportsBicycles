@@ -120,6 +120,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                 subTotal = price;
 
+                if (bike.Weight == null || bike.Weight <= 0)
+                    return Fail(BusinessCode.INVALID_DATA, "Bike chưa có trọng lượng hợp lệ");
+
                 int weight = (int)(bike.Weight * 1000);
 
                 var fee = await _shippingProviderClient.CalculateFeeAsync(
