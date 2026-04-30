@@ -142,6 +142,9 @@ public class BuyerListingService : IBuyerListingService
             Brand = b.Brand,
             Category = b.Category,
             Price = b.SalePrice,
+
+            Weight = Math.Round((decimal)b.Weight, 1), // ✅ ADD
+
             FrameSize = b.FrameSize,
             FrameMaterial = b.FrameMaterial,
             Paint = b.Paint,
@@ -150,6 +153,7 @@ public class BuyerListingService : IBuyerListingService
             TireRim = b.TireRim,
             BrakeType = b.BrakeType,
             Overall = b.Overall,
+
             Condition = b.Condition,
             City = b.City,
             Status = b.Status.ToString(),
