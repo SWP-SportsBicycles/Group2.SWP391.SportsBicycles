@@ -20,6 +20,7 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
 
         // ===== BUSINESS CORE =====
         public string SerialNumber { get; set; } = default!; // 🔥 chống xe trộm
+        public double Weight { get; set; } // kg
         public string Category { get; set; } = default!;
         public string Brand { get; set; } = default!;
         public string FrameSize { get; set; } = default!;

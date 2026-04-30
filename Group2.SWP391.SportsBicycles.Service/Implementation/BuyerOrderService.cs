@@ -120,13 +120,16 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 
                 subTotal = price;
 
+                int weight = (int)(bike.Weight * 1000);
+
                 var fee = await _shippingProviderClient.CalculateFeeAsync(
                     "GHN",
                     sellerProfile.FromDistrictId,
                     sellerProfile.FromWardCode,
                     dto.ToDistrictId,
                     dto.ToWardCode,
-                    (int)price
+                    (int)price,
+                    weight // 👈 THÊM
                 );
 
                 if (!fee.IsSuccess)
@@ -307,7 +310,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     ShippingProvider = o.Shipment.ShippingProvider,
                     ShipmentStatus = o.Shipment.Status.ToString(),
                     ShippingFee = o.Shipment.ShippingFee,
-                    DeliveredAt = o.Shipment.DeliveredAt
+                    DeliveredAt = o.Shipment.DeliveredAt,
+
+                    TrackingUrl = !string.IsNullOrWhiteSpace(o.Shipment.ProviderOrderCode)
+        ? $"https://donhang.ghn.vn/?order_code={o.Shipment.ProviderOrderCode}"
+        : null
                 },
 
                 Items = o.OrderItems.Select(oi => new
@@ -469,7 +476,11 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     ProviderOrderCode = order.Shipment.ProviderOrderCode,
                     ShippingProvider = order.Shipment.ShippingProvider,
                     ShipmentStatus = order.Shipment.Status.ToString(),
-                    ShippingFee = order.Shipment.ShippingFee
+                    ShippingFee = order.Shipment.ShippingFee,
+
+                    TrackingUrl = !string.IsNullOrWhiteSpace(order.Shipment.ProviderOrderCode)
+        ? $"https://donhang.ghn.vn/?order_code={order.Shipment.ProviderOrderCode}"
+        : null
                 },
 
                 Items = order.OrderItems.Select(oi => new
