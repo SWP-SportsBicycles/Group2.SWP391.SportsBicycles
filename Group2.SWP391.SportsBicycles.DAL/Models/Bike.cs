@@ -33,6 +33,7 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
         public string Operating { get; set; } = default!;
         public string TireRim { get; set; } = default!;
         public string BrakeType { get; set; } = default!;
+        
 
         // ===== INSPECTION RESULT =====
         public string Overall { get; set; } = default!;

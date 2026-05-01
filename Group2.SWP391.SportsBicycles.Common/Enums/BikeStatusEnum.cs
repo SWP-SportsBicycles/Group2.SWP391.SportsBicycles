@@ -8,6 +8,7 @@ namespace Group2.SWP391.SportsBicycles.Common.Enums
 {
     public enum BikeStatusEnum
     {
+        Draft = 0,
         PendingInspection = 1,   // seller submit
         PendingReview = 2,       // inspector đã check xong
         Available = 3,
