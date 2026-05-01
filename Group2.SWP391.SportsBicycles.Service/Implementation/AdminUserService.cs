@@ -56,7 +56,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 var query = _userRepo.AsQueryable()
                     .Where(x =>
                         x.Role != RoleEnum.INSPECTOR &&
-                        x.Role != RoleEnum.ADMIN);
+                        x.Role != RoleEnum.ADMIN &&
+                         !x.IsDeleted);
 
                 if (!string.IsNullOrWhiteSpace(search))
                 {
@@ -76,8 +77,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 }
 
                 query = isDesc
-                    ? query.OrderByDescending(x => x.Role)
-                    : query.OrderBy(x => x.Role);
+                    ? query.OrderByDescending(x => x.CreatedAt)
+                    : query.OrderBy(x => x.CreatedAt);
 
                 var totalItems = await query.CountAsync();
 
@@ -91,6 +92,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     Id = x.Id,
                     FullName = x.FullName,
                     Email = x.Email,
+                    PhoneNumber = x.PhoneNumber,
+                    Status = x.Status.ToString(),
                     Role = x.Role.ToString(),
                     CreatedAt = x.CreatedAt
                 });
@@ -136,6 +139,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     FullName = user.FullName,
                     Email = user.Email,
                     Role = user.Role.ToString(),
+                    PhoneNumber = user.PhoneNumber,
+                    Status = user.Status.ToString(),
                     CreatedAt = user.CreatedAt,
                     TotalOrders = totalOrders,
                     CompletedOrders = completedOrders
