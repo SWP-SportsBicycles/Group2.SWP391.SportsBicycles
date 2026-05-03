@@ -36,5 +36,6 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
 
         Task<string> UploadAvatarAsync(Guid userId, IFormFile file);
         Task<(bool Success, string Message)> CreateInspectorAsync(CreateUserByAdminDto dto);
+        Task<ResponseDTO> UpdatePhoneAsync(Guid userId, string phone);
     }
 }

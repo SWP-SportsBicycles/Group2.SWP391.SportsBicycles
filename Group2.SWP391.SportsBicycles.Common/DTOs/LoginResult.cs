@@ -18,5 +18,6 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Role { get; set; }
 
+        public bool NeedUpdateProfile { get; set; }
     }
 }
