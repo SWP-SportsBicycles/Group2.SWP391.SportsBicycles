@@ -216,5 +216,39 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.AuthController
                 return BadRequest(new { message = ex.Message });
             }
         }
+        [Authorize]
+        [HttpPut("update-phone")]
+        public async Task<IActionResult> UpdatePhone([FromBody] string phone)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                 ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+
+                if (string.IsNullOrWhiteSpace(userIdClaim))
+                    return Unauthorized(new ResponseDTO
+                    {
+                        IsSucess = false,
+                        Message = "Unauthorized"
+                    });
+
+                var userId = Guid.Parse(userIdClaim);
+
+                var result = await _authService.UpdatePhoneAsync(userId, phone);
+
+                if (!result.IsSucess)
+                    return BadRequest(result);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new ResponseDTO
+                {
+                    IsSucess = false,
+                    Message = "Lỗi server: " + ex.Message
+                });
+            }
+        }
     }
 }

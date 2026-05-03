@@ -13,7 +13,7 @@ namespace Group2.SWP391.SportsBicycles.DAL.Models
 
         public string Email { get; set; } = default!;
         public string FullName { get; set; } = default!;
-        public string PhoneNumber { get; set; } = default!;
+        public string? PhoneNumber { get; set; }
         public string Password { get; set; } = default!;
         public string? AvtUrl { get; set; }
         public string? FirebaseUID { get; set; }
