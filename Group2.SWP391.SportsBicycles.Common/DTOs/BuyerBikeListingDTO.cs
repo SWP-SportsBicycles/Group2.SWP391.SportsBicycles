@@ -15,6 +15,9 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public string Brand { get; set; } = default!;
         public string Category { get; set; } = default!;
         public string City { get; set; } // 👈 ADD
+
+        public string SellerName { get; set; }
+        public string FrameSize { get; set; }
         public string Thumbnail { get; set; } = string.Empty;
         public string Overall { get; set; } = default!;
         public bool IsWishlisted { get; set; }

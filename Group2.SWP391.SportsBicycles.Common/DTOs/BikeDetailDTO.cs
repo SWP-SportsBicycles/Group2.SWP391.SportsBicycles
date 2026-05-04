@@ -26,7 +26,6 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public double Weight { get; set; }
         public decimal Price { get; set; }
 
-        public decimal? Weight { get; set; }
         public string City { get; set; } = default!;
         public string Status { get; set; } = default!;
 

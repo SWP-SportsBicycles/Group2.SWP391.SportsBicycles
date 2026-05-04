@@ -122,8 +122,9 @@ public class BuyerListingService : IBuyerListingService
             Price = b.SalePrice,
             Brand = b.Brand,
             Category = b.Category,
-            City = b.City, // 👈 ADD
-
+            City = b.City, 
+            SellerName = b.Listing?.User?.FullName ?? string.Empty,
+            FrameSize = b.FrameSize,
             Thumbnail = GetThumbnail(b),
             Overall = b.Overall,
             IsInspected = b.Inspection != null,
@@ -143,8 +144,7 @@ public class BuyerListingService : IBuyerListingService
             Category = b.Category,
             Price = b.SalePrice,
 
-            Weight = Math.Round((decimal)b.Weight, 1), // ✅ ADD
-
+            Weight = (double)Math.Round((decimal)b.Weight, 1),
             FrameSize = b.FrameSize,
             FrameMaterial = b.FrameMaterial,
             Paint = b.Paint,
