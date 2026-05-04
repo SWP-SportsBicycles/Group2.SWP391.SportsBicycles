@@ -250,5 +250,110 @@ Tiền đã được chuyển về tài khoản ngân hàng bạn đã đăng k�
                 return Fail("Lỗi payout: " + ex.Message);
             }
         }
+
+        public async Task<ResponseDTO> GetOrderDetailAsync(Guid orderId)
+        {
+            var order = await _orderRepo.AsQueryable()
+        .Include(o => o.OrderItems)
+            .ThenInclude(oi => oi.Bike)
+                .ThenInclude(b => b.Listing)
+                    .ThenInclude(l => l.User)
+        .Include(o => o.User) // buyer
+        .Include(o => o.Transaction)
+        .Include(o => o.Shipment)
+        .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                return Fail("Không tìm thấy order");
+
+            var bike = order.OrderItems.First().Bike;
+            var seller = bike.Listing.User;
+
+            decimal originalPrice = bike.OriginalPrice;
+            decimal commission = originalPrice * 0.05m;
+            decimal inspectionFee = 100000;
+            decimal payout = originalPrice - commission - inspectionFee;
+
+            return Success(new
+            {
+                OrderId = order.Id,
+                Status = order.Status.ToString(),
+
+                // ===== MONEY =====
+                TotalAmount = order.TotalAmount,
+                OriginalPrice = originalPrice,
+                Commission = commission,
+                InspectionFee = inspectionFee,
+                PayoutAmount = payout,
+
+                // ===== SELLER =====
+                SellerName = seller.FullName,
+                SellerEmail = seller.Email,
+
+                // ===== BUYER =====
+                BuyerName = order.User.FullName,
+                BuyerEmail = order.User.Email,
+
+                // ===== PAYMENT =====
+                Transaction = order.Transaction == null ? null : new
+                {
+                    Status = order.Transaction.Status.ToString(),
+                    Amount = order.Transaction.Amount,
+                    PaidAt = order.Transaction.PaidAt
+                },
+
+                // ===== SHIPMENT =====
+                Shipment = order.Shipment == null ? null : new
+                {
+                    Status = order.Shipment.Status.ToString(),
+                    DeliveredAt = order.Shipment.DeliveredAt
+                },
+
+                CompletedAt = order.CompletedAt,
+                PaidOutAt = order.PaidOutAt
+            });
+        }
+
+        public async Task<ResponseDTO> GetOrderPayoutInfoAsync(Guid orderId)
+        {
+            var order = await _orderRepo.AsQueryable()
+      .Include(o => o.OrderItems)
+          .ThenInclude(oi => oi.Bike)
+              .ThenInclude(b => b.Listing)
+                  .ThenInclude(l => l.User)
+                      .ThenInclude(u => u.SellerShippingProfiles)
+      .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                return Fail("Không tìm thấy order");
+
+            var bike = order.OrderItems.First().Bike;
+            var seller = bike.Listing.User;
+
+            var bank = seller.SellerShippingProfiles
+                .OrderByDescending(x => x.IsDefault)
+                .FirstOrDefault();
+
+            if (bank == null)
+                return Fail("Seller chưa có thông tin ngân hàng");
+
+            decimal originalPrice = bike.OriginalPrice;
+            decimal payout = originalPrice - (originalPrice * 0.05m) - 100000;
+
+            return Success(new
+            {
+                OrderId = order.Id,
+
+                SellerName = seller.FullName,
+
+                // 💰 SỐ TIỀN ADMIN PHẢI CHUYỂN
+                PayoutAmount = payout,
+
+                // 🏦 NGÂN HÀNG
+                BankName = bank.BankName,
+                BankAccountNumber = bank.BankAccountNumber,
+                BankAccountName = bank.BankAccountName
+            });
+        }
     }
 }
