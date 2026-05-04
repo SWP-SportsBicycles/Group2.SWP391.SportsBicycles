@@ -13,17 +13,21 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         private readonly IGenericRepository<Inspection> _inspectionRepo;
         private readonly IGenericRepository<Order> _orderRepo;
         private readonly IGenericRepository<Bike> _bikeRepo;
+        private readonly IGenericRepository<Listing> _listingRepo;
         private readonly IUnitOfWork _uow;
 
         public InspectorService(
             IGenericRepository<Inspection> inspectionRepo,
             IGenericRepository<Order> orderRepo,
             IGenericRepository<Bike> bikeRepo,
+            IGenericRepository<Listing> listingRepo,
+
             IUnitOfWork uow)
         {
             _inspectionRepo = inspectionRepo;
             _orderRepo = orderRepo;
             _bikeRepo = bikeRepo;
+            _listingRepo = listingRepo;
             _uow = uow;
         }
 
@@ -168,6 +172,39 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             });
         }
 
+
+
+
+        public async Task<ResponseDTO> GetDashboardAsync(Guid inspectorId)
+        {
+            var start = DateTime.UtcNow.AddHours(7).Date;
+            var end = start.AddDays(1);
+
+            // 🔥 Đang chờ (tổng job chưa làm)
+            var pendingCount = await _listingRepo.AsQueryable()
+                .Where(l => l.Status == ListingStatusEnum.PendingInspection)
+                .CountAsync();
+
+            // 🔥 Hôm nay (job mới hôm nay)
+            var todayCount = await _listingRepo.AsQueryable()
+                .Where(l =>
+                    l.Status == ListingStatusEnum.PendingInspection &&
+                    l.CreatedAt >= start &&
+                    l.CreatedAt < end)
+                .CountAsync();
+
+            // 🔥 Đã hoàn thành (inspector làm xong)
+            var completedCount = await _listingRepo.AsQueryable()
+                .Where(l => l.Status == ListingStatusEnum.PendingReview)
+                .CountAsync();
+
+            return Success(new
+            {
+                Pending = pendingCount,
+                Today = todayCount,
+                Completed = completedCount
+            });
+        }
         public async Task<ResponseDTO> GetInspectionHistoryDetailAsync(Guid inspectionId)
         {
             var inspection = await _inspectionRepo.GetById(inspectionId);

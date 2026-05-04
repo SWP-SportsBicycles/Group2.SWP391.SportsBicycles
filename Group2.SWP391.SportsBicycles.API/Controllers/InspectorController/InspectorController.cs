@@ -1,6 +1,7 @@
-﻿using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
-using Group2.SWP391.SportsBicycles.Common.DTOs;
+﻿using Group2.SWP391.SportsBicycles.Common.DTOs;
+using Group2.SWP391.SportsBicycles.Common.DTOs.BusinessCode;
 using Group2.SWP391.SportsBicycles.Services.Contract;
+using Group2.SWP391.SportsBicycles.Services.Implementation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -72,6 +73,14 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.InspectorController
             return HandleResult(result);
         }
 
-       
+
+
+        [HttpGet("dashboard")]
+        public async Task<IActionResult> GetDashboard()
+        {
+            var userId = GetUserId();
+            var result = await _service.GetDashboardAsync(userId);
+            return Ok(result);
+        }
     }
 }
