@@ -1,5 +1,6 @@
 ﻿using Group2.SWP391.SportsBicycles.Common.Enums;
 using Group2.SWP391.SportsBicycles.Services.Contract;
+using Group2.SWP391.SportsBicycles.Services.Implementation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -43,6 +44,18 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.AdminController
         {
             var result = await _service.ConfirmPayoutAsync(orderId);
             return Ok(result);
+        }
+        [HttpGet("{orderId}")]
+        public async Task<IActionResult> GetOrderDetail(Guid orderId)
+        {
+            var res = await _service.GetOrderDetailAsync(orderId);
+            return Ok(res);
+        }
+        [HttpGet("{orderId}/payout-info")]
+        public async Task<IActionResult> GetPayoutInfo(Guid orderId)
+        {
+            var res = await _service.GetOrderPayoutInfoAsync(orderId);
+            return Ok(res);
         }
     }
 }
