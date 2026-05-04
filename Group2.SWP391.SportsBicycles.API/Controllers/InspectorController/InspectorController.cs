@@ -82,5 +82,14 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.InspectorController
             var result = await _service.GetDashboardAsync(userId);
             return Ok(result);
         }
+
+        [HttpGet("all")]
+        public async Task<IActionResult> GetAll(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10)
+        {
+            var result = await _service.GetAllAsync(pageNumber, pageSize);
+            return HandleResult(result);
+        }
     }
 }

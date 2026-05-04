@@ -172,7 +172,35 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             });
         }
 
+        public async Task<ResponseDTO> GetAllAsync(int pageNumber, int pageSize)
+        {
+            if (pageNumber <= 0 || pageSize <= 0)
+                return Fail(BusinessCode.INVALID_INPUT, "Invalid pagination");
 
+            var query = _bikeRepo.AsQueryable()
+                .Include(b => b.Medias)
+                .Where(b =>
+                    b.Status == BikeStatusEnum.PendingInspection ||   // đang chờ
+                    b.Status == BikeStatusEnum.Available               // đã duyệt (admin xong)
+                )
+                .OrderByDescending(b => b.CreatedAt);
+
+            var totalItems = await query.CountAsync();
+
+            var bikes = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return Success(new
+            {
+                Items = bikes,
+                TotalItems = totalItems,
+                TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize),
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            });
+        }
 
 
         public async Task<ResponseDTO> GetDashboardAsync(Guid inspectorId)
