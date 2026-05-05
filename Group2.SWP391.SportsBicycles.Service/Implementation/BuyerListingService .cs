@@ -53,7 +53,7 @@ public class BuyerListingService : IBuyerListingService
     {
         return await _orderRepo.AsQueryable()
             .Where(o =>
-                o.Status == OrderStatusEnum.Pending ||
+                //o.Status == OrderStatusEnum.Pending ||
                 o.Status == OrderStatusEnum.Paid ||
                 o.Status == OrderStatusEnum.Confirmed ||
                 o.Status == OrderStatusEnum.Shipping)

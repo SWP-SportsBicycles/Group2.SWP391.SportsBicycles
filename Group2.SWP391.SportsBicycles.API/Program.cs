@@ -20,7 +20,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")
     )
-);  
+);
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
 try
@@ -65,9 +65,9 @@ builder.Services.AddScoped<IAdminListingService, AdminListingService>();
 builder.Services.AddScoped<IBuyerOrderService, BuyerOrderService>();
 builder.Services.AddHttpClient<IChatService, ChatService>();
 builder.Services.AddScoped<IShipmentService, ShipmentService>();
-builder.Services.AddScoped<ISellerMediaService, SellerMediaService>();  
+builder.Services.AddScoped<ISellerMediaService, SellerMediaService>();
 builder.Services.AddHttpClient<IShippingProviderClient, GhnShippingProviderClient>();
-builder.Services.AddScoped<IPaymentService, PaymentService>(); 
+builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddHttpClient<IPayOSService, PayOSService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddHttpClient<IGhnLocationService, GhnLocationService>();
@@ -87,6 +87,15 @@ builder.Services.AddScoped<ISellerOrderService, SellerOrderService>();
 builder.Services.AddScoped<ISellerShippingProfileService, SellerShippingProfileService>();
 builder.Services.AddScoped<IFakeShipmentService, FakeShipmentService>();
 
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendCors", policy =>
+        policy.WithOrigins("http://localhost:3000")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials());
+});
 
 builder.Services.Configure<GhnSettings>(
     builder.Configuration.GetSection("GHN"));
@@ -142,22 +151,22 @@ builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(c =>
 {
-c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
-{
-    Title = "SportsBicyclesStore.API",
-    Version = "1.0.0"
-});
-c.DescribeAllParametersInCamelCase();
-// Không cần nhập chữ Bearer
-c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-{
-    Name = "Authorization",
-    Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
-    Scheme = "bearer",
-    BearerFormat = "JWT",
-    In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-    Description = "Paste your JWT token here (no need to add 'Bearer')"
-});
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "SportsBicyclesStore.API",
+        Version = "1.0.0"
+    });
+    c.DescribeAllParametersInCamelCase();
+    // Không cần nhập chữ Bearer
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Paste your JWT token here (no need to add 'Bearer')"
+    });
     c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
         {
@@ -207,6 +216,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
+app.UseCors("FrontendCors");
 app.UseAuthentication();
 app.UseAuthorization();
 
