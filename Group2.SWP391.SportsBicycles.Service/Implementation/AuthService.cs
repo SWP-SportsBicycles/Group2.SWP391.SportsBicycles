@@ -400,12 +400,12 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                         FirebaseUID = firebaseUid,
                         Email = email ?? string.Empty,
                         FullName = !string.IsNullOrWhiteSpace(fullName) ? fullName : "Google User",
-                        PhoneNumber = string.Empty,
+                        PhoneNumber = null,
                         Password = string.Empty,
                         AvtUrl = avatar,
                         Role = role,
                         WalletBalance = 0,
-                        Status = UserStatusEnum.Active
+                        Status = UserStatusEnum.InActive
                     };
 
                     await _userRepo.Insert(user);
@@ -472,7 +472,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     Message = "Đăng nhập Google thành công.",
                     Token = accessToken,
                     RefreshToken = refreshToken,
-                    Role = user.Role.ToString()
+                    Role = user.Role.ToString(),
+
+                    NeedUpdateProfile = string.IsNullOrWhiteSpace(user.PhoneNumber)
                 };
             }
             catch (Exception ex)
@@ -678,6 +680,85 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             await _uow.SaveChangeAsync();
 
             return (true, "Tạo tài khoản INSPECTOR thành công.");
+        }
+        public async Task<ResponseDTO> UpdatePhoneAsync(Guid userId, string phone)
+        {
+            if (string.IsNullOrWhiteSpace(phone))
+            {
+                return new ResponseDTO
+                {
+                    IsSucess = false,
+                    Message = "Phone không hợp lệ"
+                };
+            }
+
+            // 🔥 normalize
+            phone = phone.Trim();
+
+            // 🔥 validate chỉ số
+            if (!phone.All(char.IsDigit))
+            {
+                return new ResponseDTO
+                {
+                    IsSucess = false,
+                    Message = "Số điện thoại chỉ được chứa số"
+                };
+            }
+
+            // 🔥 validate độ dài VN (10 số)
+            if (phone.Length != 10)
+            {
+                return new ResponseDTO
+                {
+                    IsSucess = false,
+                    Message = "Số điện thoại phải có 10 chữ số"
+                };
+            }
+
+            // 🔥 validate đầu số VN
+            if (!phone.StartsWith("0"))
+            {
+                return new ResponseDTO
+                {
+                    IsSucess = false,
+                    Message = "Số điện thoại phải bắt đầu bằng 0"
+                };
+            }
+
+            var existed = await _userRepo.GetFirstByExpression(x => x.PhoneNumber == phone);
+            if (existed != null && existed.Id != userId) // 🔥 FIX duplicate chính nó
+            {
+                return new ResponseDTO
+                {
+                    IsSucess = false,
+                    Message = "Số điện thoại đã tồn tại"
+                };
+            }
+
+            var user = await _userRepo.GetById(userId);
+            if (user == null || user.IsDeleted)
+            {
+                return new ResponseDTO
+                {
+                    IsSucess = false,
+                    Message = "User không tồn tại"
+                };
+            }
+
+            user.PhoneNumber = phone;
+
+            // 🔥 ACTIVE sau khi nhập phone
+            if (user.Status == UserStatusEnum.InActive)
+                user.Status = UserStatusEnum.Active;
+
+            await _userRepo.Update(user);
+            await _uow.SaveChangeAsync();
+
+            return new ResponseDTO
+            {
+                IsSucess = true,
+                Message = "Cập nhật số điện thoại thành công"
+            };
         }
     }
 }

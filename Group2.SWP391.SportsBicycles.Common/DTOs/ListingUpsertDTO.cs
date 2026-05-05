@@ -21,7 +21,7 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public string FrameSize { get; set; } = default!;
         public string FrameMaterial { get; set; } = default!;
         public string Condition { get; set; } = default!;
-
+        public double Weight { get; set; }
         public string Paint { get; set; } = default!;
         public string Groupset { get; set; } = default!;
         public string Operating { get; set; } = default!;
@@ -46,7 +46,7 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public string FrameSize { get; set; } = default!;
         public string FrameMaterial { get; set; } = default!;
         public string Condition { get; set; } = default!;
-
+        public double Weight { get; set; }
         public string Paint { get; set; } = default!;
         public string Groupset { get; set; } = default!;
         public string Operating { get; set; } = default!;
@@ -67,6 +67,7 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public string Title { get; set; } = default!;
         public string Description { get; set; } = default!;
         public string Status { get; set; } = default!;
+        public double Weight { get; set; }
 
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }

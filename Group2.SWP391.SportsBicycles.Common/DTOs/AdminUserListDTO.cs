@@ -12,7 +12,8 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public string FullName { get; set; } = default!;
         public string Email { get; set; } = default!;
         public string Role { get; set; } = default!;
- 
+        public string? PhoneNumber { get; set; }
+        public string? Status { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 
@@ -23,6 +24,8 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public string Email { get; set; } = default!;
         public string Role { get; set; } = default!;
         public bool IsActive { get; set; }
+        public string? PhoneNumber { get; set; }
+        public string? Status { get; set; }
         public DateTime CreatedAt { get; set; }
 
         // ===== COMMON =====

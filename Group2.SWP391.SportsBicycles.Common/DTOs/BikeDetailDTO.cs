@@ -23,10 +23,9 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
         public string TireRim { get; set; } = default!;
         public string BrakeType { get; set; } = default!;
         public string Overall { get; set; } = default!;
-
+        public double Weight { get; set; }
         public decimal Price { get; set; }
 
-        public decimal? Weight { get; set; }
         public string City { get; set; } = default!;
         public string Status { get; set; } = default!;
 
