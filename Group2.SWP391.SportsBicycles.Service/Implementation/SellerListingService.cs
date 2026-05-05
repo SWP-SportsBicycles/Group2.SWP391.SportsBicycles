@@ -15,12 +15,14 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         private readonly IGenericRepository<Order> _orderRepo;
         private readonly IUnitOfWork _uow;
         private readonly IGenericRepository<SellerShippingProfile> _shippingRepo;
+        private readonly IGenericRepository<Review> _reviewRepo;
 
         public SellerListingService(
             IGenericRepository<Listing> listingRepo,
             IGenericRepository<Bike> bikeRepo,
             IGenericRepository<Order> orderRepo,
             IGenericRepository<SellerShippingProfile> shippingRepo,
+            IGenericRepository<Review> reviewRepo,
             IUnitOfWork uow)
         {
             _listingRepo = listingRepo;
@@ -28,6 +30,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             _orderRepo = orderRepo;
             _shippingRepo = shippingRepo;
             _uow = uow;
+            _reviewRepo = reviewRepo;
         }
 
         // ================= HELPER =================
@@ -720,6 +723,57 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
             }
 
             return dto;
+        }
+
+        public async Task<ResponseDTO> GetSoldListingsWithFeedbackAsync(Guid sellerId, int page, int size)
+        {
+            var query = _orderRepo.AsQueryable()
+        .Include(o => o.OrderItems)
+            .ThenInclude(oi => oi.Bike)
+                .ThenInclude(b => b.Listing)
+        .Include(o => o.Review)
+        .Where(o =>
+            o.Status == OrderStatusEnum.Completed &&
+            o.OrderItems.Any(oi => oi.Bike.Listing.UserId == sellerId))
+        .OrderByDescending(o => o.CreatedAt);
+
+            var total = await query.CountAsync();
+
+            var orders = await query
+                .Skip((page - 1) * size)
+                .Take(size)
+                .ToListAsync();
+
+            var data = orders.Select(o =>
+            {
+                var bike = o.OrderItems.First().Bike;
+                var listing = bike.Listing;
+
+                return new
+                {
+                    ListingId = listing.Id,
+                    ListingTitle = listing.Title,
+
+                    OrderId = o.Id,
+                    SoldAt = o.UpdatedAt,
+
+                    Price = bike.Price,
+
+                    Rating = o.Review?.Rating,
+                    Comment = o.Review?.Comment,
+                    ReviewedAt = o.Review?.CreatedAt,
+                };
+            });
+
+            return new ResponseDTO
+            {
+                IsSucess = true,
+                Data = new
+                {
+                    Items = data,
+                    TotalItems = total
+                }
+            };
         }
     }
 }   

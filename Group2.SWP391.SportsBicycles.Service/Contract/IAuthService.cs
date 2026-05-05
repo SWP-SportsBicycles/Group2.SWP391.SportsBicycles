@@ -24,7 +24,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
 
         Task<(bool Success, string Message, string? ErrorType)> LogoutAsync(string refreshToken);
 
-        Task<LoginResult> GoogleSignInAsync(string idToken, RoleEnum role, string? ipAddress, string? deviceInfo);
+        Task<LoginResult> GoogleSignInAsync(string idToken, RoleEnum? role, string? ipAddress, string? deviceInfo);
 
         Task<(bool Success, string Message)> ChangePasswordAsync(Guid userId, ChangePasswordDto dto);
 

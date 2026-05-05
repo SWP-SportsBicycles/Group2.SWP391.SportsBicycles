@@ -99,6 +99,16 @@ namespace Group2.SWP391.SportsBicycles.API.Controllers.SellerController
             return Ok(result);
         }
 
+        [HttpGet("sold-history")]
+        public async Task<IActionResult> GetSoldHistory(int page = 1, int size = 10)
+        {
+            var sellerId = GetUserId();
+
+            var res = await _service.GetSoldListingsWithFeedbackAsync(sellerId, page, size);
+
+            return Ok(res);
+        }
+
         // ================= HANDLE =================
         private IActionResult HandleResult(ResponseDTO result)
         {

@@ -406,10 +406,21 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 .Include(r => r.Order)
                     .ThenInclude(o => o.Transaction)
                 .Include(r => r.User)
-                .Where(r =>
-                    r.Status == ReportStatusEnum.Reviewing &&
-                    r.Order.Transaction.Status == TransactionStatusEnum.Paid
-                );
+                .AsQueryable();
+
+            // 🔥 FILTER STATUS (linh hoạt)
+            if (!string.IsNullOrWhiteSpace(status) &&
+                Enum.TryParse<ReportStatusEnum>(status, true, out var reportStatus))
+            {
+                query = query.Where(r => r.Status == reportStatus);
+            }
+
+            // 🔥 FILTER TYPE (nếu có)
+            if (!string.IsNullOrWhiteSpace(type) &&
+                Enum.TryParse<ReportTypeEnum>(type, true, out var reportType))
+            {
+                query = query.Where(r => r.Type == reportType);
+            }
 
             var total = await query.CountAsync();
 
@@ -421,9 +432,16 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 {
                     ReportId = r.Id,
                     r.OrderId,
+
                     BuyerName = r.User.FullName,
+
                     Status = r.Status.ToString(),
                     StatusDisplay = MapReportStatusDisplay(r.Status),
+
+                    TransactionStatus = r.Order.Transaction == null
+                        ? null
+                        : r.Order.Transaction.Status.ToString(),
+
                     r.Reason,
                     r.Description,
                     r.VideoUrl,

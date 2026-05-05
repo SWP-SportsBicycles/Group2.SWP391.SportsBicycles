@@ -320,7 +320,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
         }
 
 
-        public async Task<LoginResult> GoogleSignInAsync(string idToken, RoleEnum role, string? ipAddress, string? deviceInfo)
+        public async Task<LoginResult> GoogleSignInAsync(string idToken, RoleEnum? role, string? ipAddress, string? deviceInfo)
         {
             if (string.IsNullOrWhiteSpace(idToken))
             {
@@ -331,21 +331,12 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                 };
             }
 
-            // Chỉ cho phép login Google với 2 role này
-            if (role != RoleEnum.BUYER && role != RoleEnum.SELLER)
-            {
-                return new LoginResult
-                {
-                    Success = false,
-                    Message = "Role không hợp lệ."
-                };
-            }
-
             try
             {
                 var decodedToken = await FirebaseAuth.DefaultInstance.VerifyIdTokenAsync(idToken);
 
                 var firebaseUid = decodedToken.Uid;
+
                 var email = decodedToken.Claims.ContainsKey("email")
                     ? decodedToken.Claims["email"]?.ToString()?.Trim().ToLower()
                     : null;
@@ -367,51 +358,20 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     };
                 }
 
+                //////////////////////////////////////////////////
+                // 🔥 FIND USER
+                //////////////////////////////////////////////////
                 User? user = await _userRepo.GetFirstByExpression(x => x.FirebaseUID == firebaseUid);
 
                 if (user == null && !string.IsNullOrWhiteSpace(email))
                 {
                     user = await _userRepo.GetFirstByExpression(x => x.Email == email);
-
-                    if (user != null)
-                    {
-                        user.FirebaseUID = firebaseUid;
-
-                        if (string.IsNullOrWhiteSpace(user.AvtUrl) && !string.IsNullOrWhiteSpace(avatar))
-                            user.AvtUrl = avatar;
-
-                        if (string.IsNullOrWhiteSpace(user.FullName) && !string.IsNullOrWhiteSpace(fullName))
-                            user.FullName = fullName;
-
-                        if (user.Status == UserStatusEnum.InActive)
-                            user.Status = UserStatusEnum.Active;
-
-                        await _userRepo.Update(user);
-                        await _uow.SaveChangeAsync();
-                    }
                 }
 
-                // Chưa có account => tạo mới theo role FE chọn
-                if (user == null)
-                {
-                    user = new User
-                    {
-                        Id = Guid.NewGuid(),
-                        FirebaseUID = firebaseUid,
-                        Email = email ?? string.Empty,
-                        FullName = !string.IsNullOrWhiteSpace(fullName) ? fullName : "Google User",
-                        PhoneNumber = null,
-                        Password = string.Empty,
-                        AvtUrl = avatar,
-                        Role = role,
-                        WalletBalance = 0,
-                        Status = UserStatusEnum.InActive
-                    };
-
-                    await _userRepo.Insert(user);
-                    await _uow.SaveChangeAsync();
-                }
-                else
+                //////////////////////////////////////////////////
+                // ✅ CASE 1: USER ĐÃ TỒN TẠI
+                //////////////////////////////////////////////////
+                if (user != null)
                 {
                     if (user.Status == UserStatusEnum.Banned)
                     {
@@ -422,17 +382,67 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                         };
                     }
 
-                    // Nếu account đã tồn tại mà role login khác role account
-                    if (user.Role != role)
+                    // 🔥 IGNORE ROLE FE
+
+                    if (string.IsNullOrEmpty(user.FirebaseUID))
+                        user.FirebaseUID = firebaseUid;
+
+                    if (string.IsNullOrWhiteSpace(user.AvtUrl) && !string.IsNullOrWhiteSpace(avatar))
+                        user.AvtUrl = avatar;
+
+                    if (string.IsNullOrWhiteSpace(user.FullName) && !string.IsNullOrWhiteSpace(fullName))
+                        user.FullName = fullName;
+
+                    if (user.Status == UserStatusEnum.InActive)
+                        user.Status = UserStatusEnum.Active;
+
+                    await _userRepo.Update(user);
+                    await _uow.SaveChangeAsync();
+                }
+                //////////////////////////////////////////////////
+                // ✅ CASE 2: USER MỚI
+                //////////////////////////////////////////////////
+                else
+                {
+                    if (role == null)
                     {
                         return new LoginResult
                         {
                             Success = false,
-                            Message = $"Tài khoản này đã đăng ký với vai trò {user.Role}, không thể đăng nhập với vai trò {role}."
+                            Message = "role_required"
                         };
                     }
+
+                    if (role != RoleEnum.BUYER && role != RoleEnum.SELLER)
+                    {
+                        return new LoginResult
+                        {
+                            Success = false,
+                            Message = "Role không hợp lệ."
+                        };
+                    }
+
+                    user = new User
+                    {
+                        Id = Guid.NewGuid(),
+                        FirebaseUID = firebaseUid,
+                        Email = email ?? string.Empty,
+                        FullName = !string.IsNullOrWhiteSpace(fullName) ? fullName : "Google User",
+                        PhoneNumber = null,
+                        Password = string.Empty,
+                        AvtUrl = avatar,
+                        Role = role.Value,
+                        WalletBalance = 0,
+                        Status = UserStatusEnum.InActive
+                    };
+
+                    await _userRepo.Insert(user);
+                    await _uow.SaveChangeAsync();
                 }
 
+                //////////////////////////////////////////////////
+                // 🔥 REVOKE OLD TOKENS
+                //////////////////////////////////////////////////
                 var oldTokens = await _refreshRepo.GetAllDataByExpression(
                     x => x.UserId == user.Id && !x.Revoked,
                     0, 0, null, true
@@ -447,6 +457,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     }
                 }
 
+                //////////////////////////////////////////////////
+                // 🔥 CREATE NEW TOKEN
+                //////////////////////////////////////////////////
                 var refreshToken = RefreshTokenGenerator.Generate();
 
                 var refreshEntity = new RefreshToken
@@ -457,8 +470,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     CreatedAt = DateTimeHelper.NowVN(),
                     ExpiredAt = DateTimeHelper.NowVN().AddDays(7),
                     Revoked = false,
-                    IpAddress = ipAddress,
-                    DeviceInfo = deviceInfo
+                    IpAddress = ipAddress ?? "unknown",
+                    DeviceInfo = deviceInfo ?? "unknown"
                 };
 
                 await _refreshRepo.Insert(refreshEntity);
@@ -474,6 +487,7 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
                     RefreshToken = refreshToken,
                     Role = user.Role.ToString(),
 
+                    // 🔥 để FE biết cần nhập phone
                     NeedUpdateProfile = string.IsNullOrWhiteSpace(user.PhoneNumber)
                 };
             }
