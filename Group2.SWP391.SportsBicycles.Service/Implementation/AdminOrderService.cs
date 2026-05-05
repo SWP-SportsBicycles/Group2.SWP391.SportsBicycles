@@ -129,7 +129,9 @@ namespace Group2.SWP391.SportsBicycles.Services.Implementation
 <div style='background:#f8f9fa;padding:15px;border-radius:8px'>
 <b>Mã đơn:</b> {order.Id}<br/>
 <b>Sản phẩm:</b> {bike.Listing.Title}<br/>
-<b>Giá bán:</b> {order.TotalAmount:N0} VNĐ
+<b>Giá xe:</b> {originalPrice:N0} VNĐ<br/>
+<b>Phí sàn (5%):</b> {commission:N0} VNĐ<br/>
+<b>Phí kiểm định:</b> {inspectionFee:N0} VNĐ
 </div>
 
 <p style='margin-top:15px'>💰 Số tiền sẽ giải ngân:</p>
