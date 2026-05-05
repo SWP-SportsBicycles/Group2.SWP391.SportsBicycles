@@ -10,6 +10,6 @@ namespace Group2.SWP391.SportsBicycles.Common.DTOs
     public class GoogleLoginRequestDto
     {
         public string IdToken { get; set; } = default!;
-        public RoleEnum Role { get; set; }
+        public RoleEnum? Role { get; set; }
     }
 }

@@ -30,5 +30,8 @@ namespace Group2.SWP391.SportsBicycles.Services.Contract
         Task<ResponseDTO> WithdrawAsync(Guid sellerId, Guid listingId);
 
         Task<ResponseDTO> ResubmitAsync(Guid listingId, Guid userId);
+
+        Task<ResponseDTO> GetSoldListingsWithFeedbackAsync(Guid sellerId, int page, int size);
+
     }
 }
